@@ -26,7 +26,11 @@ body {
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
+    min-height: 100dvh;
     overflow-x: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #app {
@@ -38,7 +42,7 @@ body {
 /* Header */
 .header {
     background: linear-gradient(135deg, var(--primary), var(--accent2));
-    padding: 24px 20px 16px;
+    padding: calc(env(safe-area-inset-top, 12px) + 12px) 20px 16px;
     text-align: center;
     position: sticky;
     top: 0;
@@ -401,7 +405,7 @@ body {
     width: 100%;
     max-width: 480px;
     background: var(--secondary);
-    padding: 12px 20px;
+    padding: 12px 20px calc(env(safe-area-inset-bottom, 8px) + 8px);
     display: flex;
     align-items: center;
     justify-content: space-between;

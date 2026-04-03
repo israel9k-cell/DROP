@@ -327,6 +327,11 @@ function requestNotificationPermission() {
 // ============================================================
 
 async function init() {
+    // Register Service Worker for PWA / offline support
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+
     requestNotificationPermission();
     doneSet = new Set(JSON.parse(localStorage.getItem(`done_rides_${currentPark}`) || "[]"));
     showLoading();
