@@ -453,116 +453,182 @@ function initMap() {
     // Draw detailed park zones with colored polygons
     drawParkZones();
 
-    // World labels
+    // Styled world labels (pill-shaped badges like a real app)
     for (const [name, coords] of Object.entries(WORLD_COORDS)) {
         if (name === "Isle of Berk") continue;
         const color = WORLD_MAP_COLORS[name] || "#c8a84e";
-
         const emoji = WORLD_EMOJIS[name] || "";
         const short = name.replace("Super Nintendo World", "Nintendo")
             .replace("How to Train Your Dragon", "Dragons")
             .replace("The Wizarding World", "Potter");
+
         L.marker(coords, {
             icon: L.divIcon({
-                className: "world-label",
-                html: `<div style="color:${color};font-size:12px;font-weight:700;text-align:center;white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,1),0 0 12px rgba(0,0,0,0.8),0 1px 3px rgba(0,0,0,1);letter-spacing:0.5px">${emoji} ${short}</div>`,
-                iconSize: [120, 24], iconAnchor: [60, -15],
+                className: "world-label-wrap",
+                html: `<div class="world-badge" style="--zone-color:${color}">
+                    <span class="world-badge-emoji">${emoji}</span>
+                    <span class="world-badge-name">${short}</span>
+                </div>`,
+                iconSize: [130, 32], iconAnchor: [65, -10],
             }),
             interactive: false,
         }).addTo(map);
     }
+
+    // "Open in Universal App" button
+    const appBtn = L.control({ position: "topright" });
+    appBtn.onAdd = function () {
+        const div = L.DomUtil.create("div", "map-app-btn-wrap");
+        div.innerHTML = `<button class="map-app-btn" onclick="openUniversalApp(event)">
+            &#127918; Abrir App Universal
+        </button>`;
+        return div;
+    };
+    appBtn.addTo(map);
 }
 
-// Draw colored park zones as polygons over the satellite imagery
+function openUniversalApp(e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    // Try to open Universal Orlando app (deep link), fallback to website map
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+
+    if (isIOS) {
+        // Try iOS deep link, fallback to App Store
+        window.location.href = "universalorlando://";
+        setTimeout(() => {
+            window.open("https://apps.apple.com/app/universal-orlando-resort/id317389498", "_blank");
+        }, 1500);
+    } else if (isAndroid) {
+        window.location.href = "intent://universalorlando.com#Intent;package=com.universalstudios.orlandoresort;scheme=https;end";
+    } else {
+        window.open("https://www.universalorlando.com/web/en/us/plan-your-visit/resort-maps/interactive-map.html", "_blank");
+    }
+}
+window.openUniversalApp = openUniversalApp;
+
+// ============================================================
+// Draw detailed park zones as styled polygons
+// ============================================================
 function drawParkZones() {
-    const zones = [
-        {
-            name: "Celestial Park",
-            color: "#c8a84e",
-            // Center hub - circular area
-            coords: [
-                [28.4403, -81.4473], [28.4406, -81.4469],
-                [28.4405, -81.4462], [28.4402, -81.4458],
-                [28.4397, -81.4456], [28.4392, -81.4457],
-                [28.4389, -81.4461], [28.4388, -81.4467],
-                [28.4390, -81.4473], [28.4394, -81.4476],
-                [28.4399, -81.4476],
-            ]
-        },
-        {
-            name: "Super Nintendo World",
-            color: "#e60012",
-            // Southwest area
-            coords: [
-                [28.4389, -81.4476], [28.4394, -81.4476],
-                [28.4396, -81.4479], [28.4394, -81.4490],
-                [28.4390, -81.4495], [28.4382, -81.4495],
-                [28.4378, -81.4490], [28.4378, -81.4480],
-                [28.4382, -81.4476],
-            ]
-        },
-        {
-            name: "Dark Universe",
-            color: "#6a6a8e",
-            // Northwest area
-            coords: [
-                [28.4403, -81.4476], [28.4406, -81.4473],
-                [28.4410, -81.4477], [28.4415, -81.4483],
-                [28.4418, -81.4490], [28.4415, -81.4495],
-                [28.4408, -81.4495], [28.4404, -81.4490],
-                [28.4401, -81.4482],
-            ]
-        },
-        {
-            name: "Wizarding World",
-            color: "#5c2d91",
-            // Northeast area
-            coords: [
-                [28.4405, -81.4462], [28.4406, -81.4458],
-                [28.4410, -81.4453], [28.4415, -81.4448],
-                [28.4418, -81.4443], [28.4418, -81.4437],
-                [28.4412, -81.4435], [28.4406, -81.4440],
-                [28.4402, -81.4448], [28.4402, -81.4456],
-            ]
-        },
-        {
-            name: "Isle of Berk",
-            color: "#e65100",
-            // Southeast area
-            coords: [
-                [28.4392, -81.4457], [28.4396, -81.4456],
-                [28.4398, -81.4450], [28.4396, -81.4443],
-                [28.4392, -81.4438], [28.4385, -81.4436],
-                [28.4380, -81.4440], [28.4379, -81.4448],
-                [28.4382, -81.4455], [28.4387, -81.4458],
-            ]
-        },
+    // Generate smooth circle polygon points
+    function circleCoords(center, radiusLat, radiusLng, points) {
+        const coords = [];
+        for (let i = 0; i < points; i++) {
+            const angle = (i / points) * 2 * Math.PI;
+            coords.push([
+                center[0] + radiusLat * Math.cos(angle),
+                center[1] + radiusLng * Math.sin(angle),
+            ]);
+        }
+        return coords;
+    }
+
+    // Generate petal/lobe shape for spoke worlds
+    function lobeCoords(hubCenter, worldCenter, width, depth, points) {
+        const coords = [];
+        const dLat = worldCenter[0] - hubCenter[0];
+        const dLng = worldCenter[1] - hubCenter[1];
+        const angle = Math.atan2(dLng, dLat);
+
+        for (let i = 0; i <= points; i++) {
+            const t = (i / points) * Math.PI;
+            // Parametric lobe: narrow at hub, wide at world, narrow at tip
+            const along = (1 - Math.cos(t)) / 2; // 0 to 1 to 0
+            const across = Math.sin(t);
+
+            const centerLat = hubCenter[0] + dLat * along * depth;
+            const centerLng = hubCenter[1] + dLng * along * depth;
+
+            const perpLat = -Math.sin(angle) * width * across;
+            const perpLng = Math.cos(angle) * width * across;
+
+            coords.push([centerLat + perpLat, centerLng + perpLng]);
+        }
+        return coords;
+    }
+
+    const hub = WORLD_COORDS["Celestial Park"];
+
+    // Celestial Park - smooth circle in the center
+    const celestialCoords = circleCoords(hub, 0.0008, 0.0008, 24);
+    L.polygon(celestialCoords, {
+        color: "#c8a84e", fillColor: "#c8a84e",
+        fillOpacity: 0.15, weight: 2, opacity: 0.6,
+    }).addTo(map);
+
+    // Inner ring detail (fountain area)
+    const innerRing = circleCoords(hub, 0.0003, 0.0003, 16);
+    L.polygon(innerRing, {
+        color: "#f5d76e", fillColor: "#f5d76e",
+        fillOpacity: 0.10, weight: 1, opacity: 0.4,
+        dashArray: "4,4",
+    }).addTo(map);
+
+    // World lobes - each world as a petal extending from the hub
+    const worlds = [
+        { name: "Super Nintendo World", color: "#e60012",  width: 0.0008, depth: 1.6 },
+        { name: "Dark Universe",        color: "#6a6a8e",  width: 0.0008, depth: 1.6 },
+        { name: "The Wizarding World",  color: "#5c2d91",  width: 0.0008, depth: 1.6 },
+        { name: "How to Train Your Dragon", color: "#e65100", width: 0.0008, depth: 1.6 },
     ];
 
-    zones.forEach(zone => {
-        L.polygon(zone.coords, {
-            color: zone.color,
-            fillColor: zone.color,
-            fillOpacity: 0.20,
-            weight: 2,
-            opacity: 0.7,
+    worlds.forEach(w => {
+        const wc = WORLD_COORDS[w.name];
+        const lobe = lobeCoords(hub, wc, w.width, w.depth, 20);
+
+        // Filled zone
+        L.polygon(lobe, {
+            color: w.color, fillColor: w.color,
+            fillOpacity: 0.18, weight: 2, opacity: 0.5,
+        }).addTo(map);
+
+        // Inner glow line
+        const innerLobe = lobeCoords(hub, wc, w.width * 0.5, w.depth * 0.85, 16);
+        L.polygon(innerLobe, {
+            color: w.color, fillColor: w.color,
+            fillOpacity: 0.08, weight: 1, opacity: 0.3,
+            dashArray: "3,5",
         }).addTo(map);
     });
 
-    // Draw pathways connecting zones (Celestial Park spokes)
-    const pathStyle = { color: "#c8a84e", weight: 2, opacity: 0.4, dashArray: "6,8" };
-    const center = WORLD_COORDS["Celestial Park"];
-    ["Super Nintendo World", "Dark Universe", "The Wizarding World", "How to Train Your Dragon"].forEach(name => {
-        L.polyline([center, WORLD_COORDS[name]], pathStyle).addTo(map);
+    // Pathways (animated-style dashed gold lines from hub to each world)
+    const pathStyle = {
+        color: "#f5d76e", weight: 3, opacity: 0.5,
+        dashArray: "8,10", lineCap: "round",
+    };
+    worlds.forEach(w => {
+        L.polyline([hub, WORLD_COORDS[w.name]], pathStyle).addTo(map);
     });
 
-    // Park entrance marker
-    const entranceCoords = [28.4375, -81.4465];
+    // Entrance path from south
+    const entranceCoords = [28.4370, -81.4465];
+    L.polyline([entranceCoords, hub], {
+        color: "#f5d76e", weight: 3, opacity: 0.4,
+        dashArray: "6,8",
+    }).addTo(map);
+
+    // Entrance badge
     L.marker(entranceCoords, {
         icon: L.divIcon({
-            className: "world-label",
-            html: '<div style="color:#f5d76e;font-size:13px;font-weight:900;text-align:center;text-shadow:0 0 8px rgba(0,0,0,1),0 0 16px rgba(0,0,0,0.9);letter-spacing:1px">ENTRADA</div>',
-            iconSize: [100, 24], iconAnchor: [50, 12],
+            className: "world-label-wrap",
+            html: `<div class="entrance-badge">
+                <span>&#128682;</span> ENTRADA
+            </div>`,
+            iconSize: [120, 30], iconAnchor: [60, 15],
+        }),
+        interactive: false,
+    }).addTo(map);
+
+    // Helios Grand Hotel (center-north, dividing the worlds)
+    const hotelCoords = [28.4412, -81.4465];
+    L.marker(hotelCoords, {
+        icon: L.divIcon({
+            className: "world-label-wrap",
+            html: `<div class="hotel-badge">
+                <span>&#127976;</span> Helios Grand Hotel
+            </div>`,
+            iconSize: [160, 26], iconAnchor: [80, 13],
         }),
         interactive: false,
     }).addTo(map);
