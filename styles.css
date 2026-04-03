@@ -471,6 +471,19 @@ body {
     100% { background-position: -200% 0; }
 }
 
+/* Attribution */
+.attribution {
+    text-align: center;
+    padding: 16px 12px 80px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.attribution a {
+    color: var(--gold);
+    text-decoration: none;
+}
+
 /* Responsive */
 @media (max-width: 360px) {
     .park-btn { padding: 5px 10px; font-size: 10px; }

@@ -6,7 +6,7 @@
 const PARKS = {
     islands: { id: 64, name: "Islands of Adventure" },
     studios: { id: 65, name: "Universal Studios Florida" },
-    epicuniverse: { id: 223, name: "Epic Universe" }
+    epicuniverse: { id: 334, name: "Epic Universe" }
 };
 
 const API_BASE = "https://queue-times.com/parks";
