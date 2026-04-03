@@ -1,20 +1,23 @@
 // ============================================================
 // Epic Universe - Fullscreen Map with GPS Navigation
-// Uses Leaflet.js (free) + CARTO dark tiles
+// Uses Leaflet.js + Google Maps satellite tiles
 // ============================================================
 
-// Epic Universe coordinates (4700 W Sand Lake Rd, Orlando)
-const PARK_CENTER = [28.4735, -81.4685];
-const PARK_ZOOM = 16.5;
+// Epic Universe REAL coordinates (1001 Epic Blvd, Orlando FL 32819)
+const PARK_CENTER = [28.4396, -81.4465];
+const PARK_ZOOM = 17;
 
-// World area centers (hub-and-spoke: Celestial=center, NW/NE/SE/SW)
+// World area centers based on real layout:
+// Entrance faces SOUTH. Clockwise from entrance:
+// SW = Super Nintendo, NW = Dark Universe, NE = Potter, SE = Dragon
+// Center = Celestial Park
 const WORLD_COORDS = {
-    "Celestial Park":           [28.4735, -81.4685],
-    "Super Nintendo World":     [28.4748, -81.4705],
-    "Dark Universe":            [28.4748, -81.4665],
-    "The Wizarding World":      [28.4720, -81.4665],
-    "How to Train Your Dragon": [28.4720, -81.4705],
-    "Isle of Berk":             [28.4720, -81.4705],
+    "Celestial Park":           [28.4396, -81.4465],
+    "Super Nintendo World":     [28.4386, -81.4482],
+    "Dark Universe":            [28.4410, -81.4482],
+    "The Wizarding World":      [28.4410, -81.4448],
+    "How to Train Your Dragon": [28.4386, -81.4448],
+    "Isle of Berk":             [28.4386, -81.4448],
 };
 
 const WORLD_MAP_COLORS = {
@@ -414,14 +417,22 @@ function initMap() {
         attributionControl: false,
     });
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 20,
-        subdomains: "abcd",
+    // Google Maps satellite tiles
+    L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
+        maxZoom: 21,
+        subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    }).addTo(map);
+
+    // Google Maps labels overlay (roads, place names)
+    L.tileLayer("https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}", {
+        maxZoom: 21,
+        subdomains: ["mt0", "mt1", "mt2", "mt3"],
+        opacity: 0.7,
     }).addTo(map);
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
     L.control.attribution({ position: "bottomleft", prefix: false })
-        .addAttribution('&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>')
+        .addAttribution('&copy; Google Maps')
         .addTo(map);
 
     // World zone circles + labels
@@ -441,7 +452,7 @@ function initMap() {
         L.marker(coords, {
             icon: L.divIcon({
                 className: "world-label",
-                html: `<div style="color:${color};font-size:10px;font-weight:700;text-align:center;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.8)">${emoji} ${short}</div>`,
+                html: `<div style="color:${color};font-size:11px;font-weight:700;text-align:center;white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,1),0 0 12px rgba(0,0,0,0.8),0 1px 3px rgba(0,0,0,1);letter-spacing:0.5px">${emoji} ${short}</div>`,
                 iconSize: [100, 20], iconAnchor: [50, -30],
             }),
             interactive: false,
