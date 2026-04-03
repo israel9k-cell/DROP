@@ -11,6 +11,13 @@ const PARKS = {
 
 const API_BASE = "https://queue-times.com/parks";
 
+// CORS proxies (fallback chain in case one is down)
+const CORS_PROXIES = [
+    (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    (url) => url  // direct attempt last (works if CORS headers present or same-origin)
+];
+
 // State
 let currentPark = "islands";
 let attractions = [];
@@ -24,14 +31,26 @@ let countdown = 60;
 // API - Fetch wait times from Queue-Times
 // ============================================================
 
+async function fetchWithCorsRetry(url) {
+    for (const proxyFn of CORS_PROXIES) {
+        try {
+            const proxiedUrl = proxyFn(url);
+            const resp = await fetch(proxiedUrl);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            return await resp.json();
+        } catch (err) {
+            console.warn(`Proxy failed: ${err.message}, trying next...`);
+        }
+    }
+    throw new Error("All CORS proxies failed");
+}
+
 async function fetchWaitTimes(parkKey) {
     const park = PARKS[parkKey];
     const url = `${API_BASE}/${park.id}/queue_times.json`;
 
     try {
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
+        const data = await fetchWithCorsRetry(url);
 
         // The API returns { lands: [ { name, rides: [ { name, wait_time, is_open, last_updated } ] } ] }
         const rides = [];

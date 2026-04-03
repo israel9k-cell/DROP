@@ -1,4 +1,4 @@
-const CACHE_NAME = "universal-go-v1";
+const CACHE_NAME = "universal-go-v2";
 const ASSETS = ["/index.html", "/styles.css", "/app.js", "/manifest.json"];
 
 self.addEventListener("install", (e) => {
@@ -17,7 +17,7 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
     // Network-first for API calls, cache-first for assets
-    if (e.request.url.includes("queue-times.com")) {
+    if (e.request.url.includes("queue-times.com") || e.request.url.includes("corsproxy.io") || e.request.url.includes("allorigins.win")) {
         e.respondWith(
             fetch(e.request)
                 .then((r) => r)
