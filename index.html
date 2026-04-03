@@ -5,33 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Universal GO">
-    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-title" content="Epic GO">
+    <meta name="theme-color" content="#0b0e2a">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
-    <title>Universal Orlando - Guia de Atracciones</title>
+    <title>Epic Universe - Guia de Atracciones</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
         <!-- Header -->
         <header class="header">
-            <div class="header-content">
-                <h1>Universal Orlando</h1>
-                <p class="subtitle">Guia Inteligente de Atracciones</p>
+            <div class="header-logo">
+                <span class="logo-icon">&#9883;</span>
+                <div>
+                    <h1>EPIC UNIVERSE</h1>
+                    <p class="subtitle">Guia Inteligente de Atracciones</p>
+                </div>
             </div>
             <div class="park-selector">
-                <button class="park-btn active" data-park="islands">Islands of Adventure</button>
-                <button class="park-btn" data-park="studios">Universal Studios</button>
-                <button class="park-btn" data-park="epicuniverse">Epic Universe</button>
+                <button class="park-btn" data-park="islands">
+                    <span class="park-icon">&#127965;</span> Islands
+                </button>
+                <button class="park-btn" data-park="studios">
+                    <span class="park-icon">&#127916;</span> Studios
+                </button>
+                <button class="park-btn active" data-park="epicuniverse">
+                    <span class="park-icon">&#9883;</span> Epic
+                </button>
             </div>
         </header>
 
+        <!-- Worlds Filter (Epic Universe Lands) -->
+        <div class="worlds-bar" id="worlds-bar">
+            <button class="world-chip active" data-world="all">
+                <span>&#127760;</span> Todos
+            </button>
+            <button class="world-chip" data-world="Celestial Park">
+                <span>&#10024;</span> Celestial
+            </button>
+            <button class="world-chip" data-world="Super Nintendo World">
+                <span>&#127918;</span> Nintendo
+            </button>
+            <button class="world-chip" data-world="Dark Universe">
+                <span>&#128123;</span> Dark
+            </button>
+            <button class="world-chip" data-world="The Wizarding World">
+                <span>&#9889;</span> Potter
+            </button>
+            <button class="world-chip" data-world="How to Train Your Dragon">
+                <span>&#128009;</span> Dragon
+            </button>
+        </div>
+
         <!-- Recommendation Banner -->
         <section class="recommendation" id="recommendation">
-            <div class="rec-icon">&#9889;</div>
+            <div class="rec-icon">&#128640;</div>
             <div class="rec-text">
                 <span class="rec-label">SIGUIENTE ATRACCION RECOMENDADA</span>
                 <h2 id="rec-name">Cargando...</h2>
@@ -76,7 +107,7 @@
             <span class="sort-label">Ordenar:</span>
             <button class="sort-btn active" data-sort="wait">Menor Espera</button>
             <button class="sort-btn" data-sort="name">Nombre</button>
-            <button class="sort-btn" data-sort="area">Area</button>
+            <button class="sort-btn" data-sort="area">Mundo</button>
         </div>
 
         <!-- Attractions List -->
@@ -86,8 +117,8 @@
 
         <!-- Refresh Timer -->
         <div class="refresh-bar" id="refresh-bar">
-            <span>Actualizacion automatica en <strong id="refresh-countdown">60</strong>s</span>
-            <button class="refresh-btn" id="refresh-btn">Actualizar Ahora</button>
+            <span>Actualizacion en <strong id="refresh-countdown">60</strong>s</span>
+            <button class="refresh-btn" id="refresh-btn">&#8635; Actualizar</button>
         </div>
 
         <!-- Notification Toast -->
@@ -95,7 +126,7 @@
             <span id="toast-msg"></span>
         </div>
 
-        <!-- Attribution (required by Queue-Times API) -->
+        <!-- Attribution -->
         <div class="attribution">
             Powered by <a href="https://queue-times.com/en-US" target="_blank" rel="noopener">Queue-Times.com</a>
         </div>

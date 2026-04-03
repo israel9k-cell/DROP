@@ -121,6 +121,26 @@ async function fetchWaitTimes(parkKey) {
 // Rendering
 // ============================================================
 
+// World icon/color mapping for Epic Universe lands
+const WORLD_THEMES = {
+    "Celestial Park":                { icon: "&#10024;",  color: "#c8a84e" },
+    "Super Nintendo World":          { icon: "&#127918;", color: "#e60012" },
+    "Dark Universe":                 { icon: "&#128123;", color: "#7b7b9e" },
+    "The Wizarding World of Harry Potter": { icon: "&#9889;", color: "#5c2d91" },
+    "The Wizarding World":           { icon: "&#9889;",   color: "#5c2d91" },
+    "How to Train Your Dragon":      { icon: "&#128009;", color: "#e65100" },
+    "Isle of Berk":                  { icon: "&#128009;", color: "#e65100" },
+};
+
+function getWorldTheme(area) {
+    for (const [key, theme] of Object.entries(WORLD_THEMES)) {
+        if (area.includes(key) || key.includes(area)) return theme;
+    }
+    return { icon: "&#127760;", color: "#c8a84e" };
+}
+
+let currentWorld = "all";
+
 function getWaitClass(wait) {
     if (wait <= 20) return "wait-low";
     if (wait <= 45) return "wait-med";
@@ -132,7 +152,12 @@ function renderAttractions() {
 
     let filtered = [...attractions];
 
-    // Filter
+    // World filter
+    if (currentWorld !== "all") {
+        filtered = filtered.filter(a => a.area.includes(currentWorld));
+    }
+
+    // Status filter
     if (currentFilter === "pending") {
         filtered = filtered.filter(a => !doneSet.has(a.id));
     } else if (currentFilter === "done") {
@@ -156,13 +181,15 @@ function renderAttractions() {
     list.innerHTML = filtered.map(a => {
         const isDone = doneSet.has(a.id);
         const isRec = bestRide && bestRide.id === a.id && !isDone;
+        const theme = getWorldTheme(a.area);
         return `
         <div class="attraction-card ${isDone ? 'done' : ''} ${isRec ? 'recommended' : ''}"
              data-id="${a.id}" onclick="toggleDone(${a.id})">
+            <div class="world-accent" style="background:${theme.color}"></div>
             <div class="attraction-check">${isDone ? '&#10003;' : ''}</div>
             <div class="attraction-info">
                 <div class="attraction-name">${a.name}</div>
-                <div class="attraction-area">${a.area}</div>
+                <div class="attraction-area"><span class="area-icon">${theme.icon}</span> ${a.area}</div>
             </div>
             <div class="wait-badge">
                 ${a.isOpen
@@ -260,7 +287,7 @@ function checkForBetterRide() {
     if (best && best.id !== lastRecommendedId) {
         lastRecommendedId = best.id;
         if (Notification.permission === "granted") {
-            new Notification("Universal Orlando Guide", {
+            new Notification("Epic Universe GO", {
                 body: `Ve a ${best.name} - Solo ${best.waitTime} min de espera!`,
                 icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎢</text></svg>"
             });
@@ -298,7 +325,7 @@ async function refreshData() {
     }
 
     btn.disabled = false;
-    btn.textContent = "Actualizar Ahora";
+    btn.innerHTML = "&#8635; Actualizar";
     countdown = 60;
 }
 
@@ -325,10 +352,26 @@ document.querySelectorAll(".park-btn").forEach(btn => {
         document.querySelectorAll(".park-btn").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         currentPark = btn.dataset.park;
+        currentWorld = "all";
+        // Show/hide worlds bar (only for Epic Universe)
+        document.getElementById("worlds-bar").style.display =
+            currentPark === "epicuniverse" ? "flex" : "none";
+        document.querySelectorAll(".world-chip").forEach(c => c.classList.remove("active"));
+        document.querySelector('.world-chip[data-world="all"]').classList.add("active");
         // Reset done set per park
         doneSet = new Set(JSON.parse(localStorage.getItem(`done_rides_${currentPark}`) || "[]"));
         showLoading();
         refreshData();
+    });
+});
+
+// Worlds filter (Epic Universe lands)
+document.querySelectorAll(".world-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+        document.querySelectorAll(".world-chip").forEach(c => c.classList.remove("active"));
+        chip.classList.add("active");
+        currentWorld = chip.dataset.world;
+        renderAttractions();
     });
 });
 

@@ -1,11 +1,11 @@
 {
-    "name": "Universal Orlando Guide",
-    "short_name": "Universal GO",
-    "description": "Guia inteligente de atracciones con tiempos de espera en tiempo real",
+    "name": "Epic Universe GO",
+    "short_name": "Epic GO",
+    "description": "Guia inteligente de Epic Universe con tiempos de espera en tiempo real",
     "start_url": "/index.html",
     "display": "standalone",
-    "background_color": "#0a0a1a",
-    "theme_color": "#1a1a2e",
+    "background_color": "#060918",
+    "theme_color": "#0b0e2a",
     "orientation": "portrait",
     "icons": [
         {
