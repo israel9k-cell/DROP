@@ -70,10 +70,12 @@
             </button>
         </div>
 
-        <!-- Map Section (hidden by default) -->
+        <!-- Map Section (fullscreen, hidden by default) -->
         <section class="map-section" id="map-section" style="display:none">
             <div id="map-container"></div>
+            <button class="map-close-btn" onclick="toggleMap()">&#10005;</button>
             <button class="map-center-btn" onclick="centerOnUser()">&#127919;</button>
+            <div class="map-gps-status" id="map-gps-status">&#128225; Conectando GPS...</div>
             <!-- Navigation Panel -->
             <div class="nav-panel" id="nav-panel" style="display:none">
                 <div class="nav-info">
@@ -87,6 +89,27 @@
                 </div>
             </div>
         </section>
+
+        <!-- GPS Permission Modal -->
+        <div class="gps-modal-overlay" id="gps-modal" style="display:none">
+            <div class="gps-modal">
+                <span class="gps-modal-icon">&#128506;</span>
+                <h3>Activar Navegacion</h3>
+                <p>Necesitamos tu ubicacion para guiarte por el parque en tiempo real</p>
+                <div class="gps-modal-features">
+                    <div><span>&#128694;</span> Ruta caminando a cada atraccion</div>
+                    <div><span>&#9201;</span> Tiempo estimado para llegar</div>
+                    <div><span>&#128205;</span> Tu posicion en el mapa en vivo</div>
+                    <div><span>&#128640;</span> Te guia a la de menor espera</div>
+                </div>
+                <button class="gps-modal-btn primary" onclick="acceptGpsPermission()">
+                    Activar GPS &#128205;
+                </button>
+                <button class="gps-modal-btn secondary" onclick="skipGpsPermission()">
+                    Continuar sin GPS
+                </button>
+            </div>
+        </div>
 
         <!-- Recommendation Banner -->
         <section class="recommendation" id="recommendation">

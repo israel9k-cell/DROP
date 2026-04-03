@@ -1,41 +1,38 @@
 // ============================================================
-// Epic Universe - Interactive Map with GPS Navigation
-// Uses Leaflet.js (free, no API key) + OpenStreetMap tiles
+// Epic Universe - Fullscreen Map with GPS Navigation
+// Uses Leaflet.js (free) + CARTO dark tiles
 // ============================================================
 
-// Epic Universe center coordinates (4700 W Sand Lake Rd, Orlando)
+// Epic Universe coordinates (4700 W Sand Lake Rd, Orlando)
 const PARK_CENTER = [28.4735, -81.4685];
 const PARK_ZOOM = 16.5;
 
-// Approximate coordinates for each world/land area center
-// Based on hub-and-spoke layout: Celestial Park center,
-// Nintendo=NW, Dark Universe=NE, Potter=SE, Dragon=SW
+// World area centers (hub-and-spoke: Celestial=center, NW/NE/SE/SW)
 const WORLD_COORDS = {
-    "Celestial Park":       [28.4735, -81.4685],
-    "Super Nintendo World": [28.4748, -81.4705],
-    "Dark Universe":        [28.4748, -81.4665],
-    "The Wizarding World":  [28.4720, -81.4665],
+    "Celestial Park":           [28.4735, -81.4685],
+    "Super Nintendo World":     [28.4748, -81.4705],
+    "Dark Universe":            [28.4748, -81.4665],
+    "The Wizarding World":      [28.4720, -81.4665],
     "How to Train Your Dragon": [28.4720, -81.4705],
-    "Isle of Berk":         [28.4720, -81.4705],
+    "Isle of Berk":             [28.4720, -81.4705],
 };
 
-// Map colors per world
 const WORLD_MAP_COLORS = {
-    "Celestial Park":       "#c8a84e",
-    "Super Nintendo World": "#e60012",
-    "Dark Universe":        "#7b7b9e",
-    "The Wizarding World":  "#5c2d91",
+    "Celestial Park":           "#c8a84e",
+    "Super Nintendo World":     "#e60012",
+    "Dark Universe":            "#7b7b9e",
+    "The Wizarding World":      "#5c2d91",
     "How to Train Your Dragon": "#e65100",
-    "Isle of Berk":         "#e65100",
+    "Isle of Berk":             "#e65100",
 };
 
 const WORLD_EMOJIS = {
-    "Celestial Park":       "\u2728",
-    "Super Nintendo World": "\uD83C\uDFAE",
-    "Dark Universe":        "\uD83D\uDC7B",
-    "The Wizarding World":  "\u26A1",
+    "Celestial Park":           "\u2728",
+    "Super Nintendo World":     "\uD83C\uDFAE",
+    "Dark Universe":            "\uD83D\uDC7B",
+    "The Wizarding World":      "\u26A1",
     "How to Train Your Dragon": "\uD83D\uDC09",
-    "Isle of Berk":         "\uD83D\uDC09",
+    "Isle of Berk":             "\uD83D\uDC09",
 };
 
 // State
@@ -47,6 +44,94 @@ let userPosition = null;
 let watchId = null;
 let mapVisible = false;
 let targetAttraction = null;
+let gpsGranted = false;
+
+// ============================================================
+// GPS Permission Flow
+// ============================================================
+
+function toggleMap() {
+    mapVisible = !mapVisible;
+    const mapSection = document.getElementById("map-section");
+    const btn = document.getElementById("map-toggle-btn");
+
+    if (mapVisible) {
+        // Check if we need to ask GPS permission
+        if (!gpsGranted && navigator.permissions) {
+            navigator.permissions.query({ name: "geolocation" }).then(result => {
+                if (result.state === "granted") {
+                    gpsGranted = true;
+                    openFullscreenMap();
+                } else if (result.state === "prompt") {
+                    // Show our custom modal first
+                    document.getElementById("gps-modal").style.display = "flex";
+                } else {
+                    // Denied - open map without GPS
+                    openFullscreenMap();
+                    updateGpsStatus("error", "GPS denegado - Activalo en Ajustes");
+                }
+            }).catch(() => {
+                // Permissions API not supported, show modal
+                document.getElementById("gps-modal").style.display = "flex";
+            });
+        } else {
+            openFullscreenMap();
+        }
+
+        btn.classList.add("active");
+        btn.innerHTML = '&#128506; Cerrar Mapa';
+    } else {
+        closeFullscreenMap();
+        btn.classList.remove("active");
+        btn.innerHTML = '&#128506; Mapa';
+    }
+}
+
+function acceptGpsPermission() {
+    document.getElementById("gps-modal").style.display = "none";
+    gpsGranted = true;
+    openFullscreenMap();
+}
+
+function skipGpsPermission() {
+    document.getElementById("gps-modal").style.display = "none";
+    openFullscreenMap();
+    updateGpsStatus("error", "GPS desactivado");
+}
+
+window.toggleMap = toggleMap;
+window.acceptGpsPermission = acceptGpsPermission;
+window.skipGpsPermission = skipGpsPermission;
+
+function openFullscreenMap() {
+    const mapSection = document.getElementById("map-section");
+    mapSection.style.display = "block";
+
+    // Prevent body scroll behind map
+    document.body.style.overflow = "hidden";
+
+    setTimeout(() => {
+        initMap();
+        map.invalidateSize();
+        updateMapMarkers();
+
+        if (gpsGranted) {
+            startGeolocation();
+        }
+
+        // Auto-navigate to recommended ride
+        const best = getBestRecommendationForMap();
+        if (best) navigateToRide(best.id);
+    }, 100);
+}
+
+function closeFullscreenMap() {
+    const mapSection = document.getElementById("map-section");
+    mapSection.style.display = "none";
+    document.body.style.overflow = "";
+    mapVisible = false;
+    stopGeolocation();
+}
 
 // ============================================================
 // Map initialization
@@ -62,19 +147,47 @@ function initMap() {
         attributionControl: false,
     });
 
-    // Dark-themed map tiles
+    // Dark tiles
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
         maxZoom: 20,
         subdomains: "abcd",
     }).addTo(map);
 
-    // Zoom control bottom-right
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
-    // Attribution
     L.control.attribution({ position: "bottomleft", prefix: false })
-        .addAttribution('&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> | <a href="https://carto.com/">CARTO</a>')
+        .addAttribution('&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>')
         .addTo(map);
+
+    // Draw world zone circles
+    for (const [name, coords] of Object.entries(WORLD_COORDS)) {
+        if (name === "Isle of Berk") continue; // duplicate
+        const color = WORLD_MAP_COLORS[name] || "#c8a84e";
+        L.circle(coords, {
+            radius: 80,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.06,
+            weight: 1,
+            opacity: 0.3,
+            dashArray: "4,6",
+        }).addTo(map);
+
+        // World label
+        const emoji = WORLD_EMOJIS[name] || "";
+        const shortName = name.replace("Super Nintendo World", "Nintendo")
+            .replace("How to Train Your Dragon", "Dragons")
+            .replace("The Wizarding World", "Potter");
+        L.marker(coords, {
+            icon: L.divIcon({
+                className: "world-label",
+                html: `<div style="color:${color};font-size:10px;font-weight:700;text-align:center;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.8)">${emoji} ${shortName}</div>`,
+                iconSize: [100, 20],
+                iconAnchor: [50, -30],
+            }),
+            interactive: false,
+        }).addTo(map);
+    }
 }
 
 // ============================================================
@@ -83,22 +196,36 @@ function initMap() {
 
 function startGeolocation() {
     if (!navigator.geolocation) {
-        showToast("Tu navegador no soporta GPS");
+        updateGpsStatus("error", "GPS no disponible");
         return;
     }
+
+    updateGpsStatus("", "\uD83D\uDCE1 Buscando senal GPS...");
 
     watchId = navigator.geolocation.watchPosition(
         (pos) => {
             userPosition = [pos.coords.latitude, pos.coords.longitude];
+            const accuracy = Math.round(pos.coords.accuracy);
+            updateGpsStatus("active", `\uD83D\uDCCD GPS activo (${accuracy}m)`);
             updateUserMarker();
             updateRoute();
             updateWalkingTime();
         },
         (err) => {
-            console.warn("Geolocation error:", err.message);
-            if (err.code === 1) showToast("Activa el GPS para navegacion");
+            console.warn("GPS error:", err.message);
+            if (err.code === 1) {
+                updateGpsStatus("error", "GPS denegado - Activalo en Ajustes");
+            } else if (err.code === 2) {
+                updateGpsStatus("error", "Senal GPS no disponible");
+            } else {
+                updateGpsStatus("error", "GPS timeout - Reintentando...");
+            }
         },
-        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+        {
+            enableHighAccuracy: true,
+            maximumAge: 3000,
+            timeout: 20000,
+        }
     );
 }
 
@@ -109,24 +236,31 @@ function stopGeolocation() {
     }
 }
 
+function updateGpsStatus(state, text) {
+    const el = document.getElementById("map-gps-status");
+    if (!el) return;
+    el.textContent = text;
+    el.className = "map-gps-status" + (state ? ` ${state}` : "");
+}
+
 function updateUserMarker() {
     if (!map || !userPosition) return;
 
     if (!userMarker) {
-        const userIcon = L.divIcon({
+        const icon = L.divIcon({
             className: "user-marker",
-            html: `<div class="user-dot"><div class="user-dot-inner"></div><div class="user-pulse"></div></div>`,
+            html: '<div class="user-dot"><div class="user-dot-inner"></div><div class="user-pulse"></div></div>',
             iconSize: [24, 24],
             iconAnchor: [12, 12],
         });
-        userMarker = L.marker(userPosition, { icon: userIcon, zIndexOffset: 1000 }).addTo(map);
+        userMarker = L.marker(userPosition, { icon, zIndexOffset: 1000 }).addTo(map);
     } else {
         userMarker.setLatLng(userPosition);
     }
 }
 
 // ============================================================
-// Attraction markers on map
+// Attraction markers
 // ============================================================
 
 function getWorldKey(area) {
@@ -139,31 +273,26 @@ function getWorldKey(area) {
 function getAttractionCoords(attraction) {
     const worldKey = getWorldKey(attraction.area);
     const base = WORLD_COORDS[worldKey] || PARK_CENTER;
-
-    // Spread rides within each world area with deterministic offset based on ride id
     const seed = attraction.id * 137;
     const offsetLat = ((seed % 100) - 50) * 0.00003;
     const offsetLng = (((seed * 7) % 100) - 50) * 0.00003;
-
     return [base[0] + offsetLat, base[1] + offsetLng];
 }
 
 function updateMapMarkers() {
-    // Clear existing
     attractionMarkers.forEach(m => map.removeLayer(m));
     attractionMarkers = [];
-
     if (!map) return;
 
     attractions.forEach(a => {
-        const isDone = window.doneSet ? window.doneSet.has(a.id) : doneSet.has(a.id);
+        const isDone = doneSet.has(a.id);
         const coords = getAttractionCoords(a);
         const worldKey = getWorldKey(a.area);
         const color = WORLD_MAP_COLORS[worldKey] || "#c8a84e";
         const emoji = WORLD_EMOJIS[worldKey] || "\uD83C\uDF10";
         const isTarget = targetAttraction && targetAttraction.id === a.id;
 
-        const markerHtml = isDone
+        const html = isDone
             ? `<div class="map-marker done-marker" style="border-color:${color}">&#10003;</div>`
             : `<div class="map-marker ${isTarget ? 'target-marker' : ''}" style="background:${color};border-color:${color}">
                    <span class="marker-wait">${a.isOpen ? a.waitTime : '---'}</span>
@@ -171,26 +300,21 @@ function updateMapMarkers() {
 
         const icon = L.divIcon({
             className: "ride-marker-wrap",
-            html: markerHtml,
+            html,
             iconSize: [36, 36],
             iconAnchor: [18, 18],
         });
 
         const marker = L.marker(coords, { icon }).addTo(map);
-
-        // Popup with ride info
         marker.bindPopup(`
             <div class="map-popup">
                 <strong>${emoji} ${a.name}</strong><br>
                 <span style="color:${color}">${a.area}</span><br>
                 ${a.isOpen
                     ? `<span class="popup-wait">${a.waitTime} min de espera</span>`
-                    : '<span style="color:#999">CERRADA</span>'
-                }
+                    : '<span style="color:#999">CERRADA</span>'}
                 <br>
-                <button onclick="navigateToRide(${a.id})" class="popup-nav-btn">
-                    Navegar aqui &#10148;
-                </button>
+                <button onclick="navigateToRide(${a.id})" class="popup-nav-btn">Navegar aqui &#10148;</button>
             </div>
         `, { className: "dark-popup" });
 
@@ -199,7 +323,7 @@ function updateMapMarkers() {
 }
 
 // ============================================================
-// Navigation / routing
+// Navigation
 // ============================================================
 
 function navigateToRide(rideId) {
@@ -207,59 +331,46 @@ function navigateToRide(rideId) {
     if (!ride) return;
 
     targetAttraction = ride;
-    const coords = getAttractionCoords(ride);
-
-    // Update route line
     updateRoute();
 
-    // Pan map to show both user and target
+    const coords = getAttractionCoords(ride);
     if (userPosition) {
-        const bounds = L.latLngBounds([userPosition, coords]);
-        map.fitBounds(bounds, { padding: [60, 60] });
+        map.fitBounds(L.latLngBounds([userPosition, coords]), { padding: [80, 80] });
     } else {
         map.setView(coords, 18);
     }
 
-    // Update markers to highlight target
     updateMapMarkers();
     updateNavPanel(ride);
+
+    // Close any open popups
+    map.closePopup();
     showToast(`Navegando a ${ride.name}`);
 }
 
-// Make it globally accessible
 window.navigateToRide = navigateToRide;
 
 function updateRoute() {
     if (!map) return;
-
-    // Remove old route
-    if (routeLine) {
-        map.removeLayer(routeLine);
-        routeLine = null;
-    }
-
+    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
     if (!userPosition || !targetAttraction) return;
 
     const targetCoords = getAttractionCoords(targetAttraction);
-
-    // Draw a dashed line from user to target
     routeLine = L.polyline([userPosition, targetCoords], {
         color: "#c8a84e",
-        weight: 3,
-        dashArray: "8, 12",
-        opacity: 0.8,
+        weight: 4,
+        dashArray: "10, 14",
+        opacity: 0.85,
     }).addTo(map);
 }
 
 function updateWalkingTime() {
     if (!userPosition || !targetAttraction) return;
-
     const targetCoords = getAttractionCoords(targetAttraction);
     const dist = getDistance(userPosition, targetCoords);
-    const walkMinutes = Math.max(1, Math.round(dist / 70)); // ~70m/min walking
-
+    const walkMin = Math.max(1, Math.round(dist / 70));
     const el = document.getElementById("nav-walk-time");
-    if (el) el.textContent = `${walkMinutes} min caminando (${Math.round(dist)}m)`;
+    if (el) el.textContent = `${walkMin} min caminando (${Math.round(dist)}m)`;
 }
 
 function getDistance([lat1, lon1], [lat2, lon2]) {
@@ -270,12 +381,15 @@ function getDistance([lat1, lon1], [lat2, lon2]) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+function getWaitClass(w) {
+    if (w <= 20) return "wait-low";
+    if (w <= 45) return "wait-med";
+    return "wait-high";
+}
+
 function updateNavPanel(ride) {
     const panel = document.getElementById("nav-panel");
-    if (!ride) {
-        panel.style.display = "none";
-        return;
-    }
+    if (!ride) { panel.style.display = "none"; return; }
 
     const worldKey = getWorldKey(ride.area);
     const color = WORLD_MAP_COLORS[worldKey] || "#c8a84e";
@@ -292,54 +406,33 @@ function updateNavPanel(ride) {
         const walkMin = Math.max(1, Math.round(dist / 70));
         document.getElementById("nav-walk-time").textContent = `${walkMin} min caminando (${Math.round(dist)}m)`;
     } else {
-        document.getElementById("nav-walk-time").textContent = "Activando GPS...";
+        document.getElementById("nav-walk-time").textContent = "Esperando GPS...";
     }
 
     panel.style.display = "flex";
 }
 
-function getWaitClass(wait) {
-    if (wait <= 20) return "wait-low";
-    if (wait <= 45) return "wait-med";
-    return "wait-high";
-}
-
 // ============================================================
-// Toggle map view
+// Center on user
 // ============================================================
 
-function toggleMap() {
-    const mapSection = document.getElementById("map-section");
-    const btn = document.getElementById("map-toggle-btn");
-
-    mapVisible = !mapVisible;
-
-    if (mapVisible) {
-        mapSection.style.display = "block";
-        btn.classList.add("active");
-        btn.innerHTML = '&#128506; Cerrar Mapa';
-
-        // Init map after DOM is visible
-        setTimeout(() => {
-            initMap();
-            map.invalidateSize();
-            updateMapMarkers();
-            startGeolocation();
-
-            // Auto-navigate to recommended ride
-            const best = getBestRecommendationForMap();
-            if (best) navigateToRide(best.id);
-        }, 100);
+function centerOnUser() {
+    if (userPosition && map) {
+        map.setView(userPosition, 18, { animate: true });
+    } else if (!gpsGranted) {
+        document.getElementById("gps-modal").style.display = "flex";
     } else {
-        mapSection.style.display = "none";
-        btn.classList.remove("active");
-        btn.innerHTML = '&#128506; Mapa';
-        stopGeolocation();
+        showToast("Esperando senal GPS...");
     }
 }
 
+window.centerOnUser = centerOnUser;
+
+// ============================================================
+// Sync with app.js
+// ============================================================
+
 function getBestRecommendationForMap() {
-    // Re-use the global function from app.js if available
     if (typeof getBestRecommendation === "function") return getBestRecommendation();
     const candidates = attractions
         .filter(a => !doneSet.has(a.id) && a.isOpen && a.waitTime >= 0)
@@ -347,34 +440,22 @@ function getBestRecommendationForMap() {
     return candidates.length > 0 ? candidates[0] : null;
 }
 
-// Center on user
-function centerOnUser() {
-    if (userPosition && map) {
-        map.setView(userPosition, 18);
-    } else {
-        showToast("Esperando senal GPS...");
+window.onMapNeedsUpdate = function () {
+    if (!mapVisible || !map) return;
+    updateMapMarkers();
+
+    // Auto-update nav if target wait time changed
+    if (targetAttraction) {
+        const updated = attractions.find(a => a.id === targetAttraction.id);
+        if (updated) {
+            targetAttraction = updated;
+            updateNavPanel(updated);
+        }
     }
-}
 
-window.toggleMap = toggleMap;
-window.centerOnUser = centerOnUser;
-
-// ============================================================
-// Auto-navigate to best recommendation when it changes
-// ============================================================
-
-function onRecommendationChanged() {
-    if (!mapVisible) return;
+    // Check if a better ride appeared
     const best = getBestRecommendationForMap();
-    if (best && (!targetAttraction || targetAttraction.id !== best.id)) {
+    if (best && (!targetAttraction || best.waitTime < targetAttraction.waitTime - 10)) {
         navigateToRide(best.id);
     }
-    updateMapMarkers();
-}
-
-// Expose for app.js to call after render
-window.onMapNeedsUpdate = function() {
-    if (!mapVisible) return;
-    updateMapMarkers();
-    onRecommendationChanged();
 };
