@@ -38,76 +38,62 @@ const WORLD_EMOJIS = {
 // State
 let map = null;
 let userMarker = null;
+let accuracyCircle = null;
 let routeLine = null;
 let attractionMarkers = [];
 let userPosition = null;
 let watchId = null;
 let mapVisible = false;
 let targetAttraction = null;
-let gpsGranted = false;
+let gpsAsked = false;
+let gpsRetryCount = 0;
 
 // ============================================================
-// GPS Permission Flow
+// Toggle map - always show GPS modal first time
 // ============================================================
 
 function toggleMap() {
-    mapVisible = !mapVisible;
-    const mapSection = document.getElementById("map-section");
-    const btn = document.getElementById("map-toggle-btn");
-
     if (mapVisible) {
-        // Check if we need to ask GPS permission
-        if (!gpsGranted && navigator.permissions) {
-            navigator.permissions.query({ name: "geolocation" }).then(result => {
-                if (result.state === "granted") {
-                    gpsGranted = true;
-                    openFullscreenMap();
-                } else if (result.state === "prompt") {
-                    // Show our custom modal first
-                    document.getElementById("gps-modal").style.display = "flex";
-                } else {
-                    // Denied - open map without GPS
-                    openFullscreenMap();
-                    updateGpsStatus("error", "GPS denegado - Activalo en Ajustes");
-                }
-            }).catch(() => {
-                // Permissions API not supported, show modal
-                document.getElementById("gps-modal").style.display = "flex";
-            });
-        } else {
-            openFullscreenMap();
-        }
-
-        btn.classList.add("active");
-        btn.innerHTML = '&#128506; Cerrar Mapa';
-    } else {
         closeFullscreenMap();
-        btn.classList.remove("active");
-        btn.innerHTML = '&#128506; Mapa';
+        return;
+    }
+
+    mapVisible = true;
+    const btn = document.getElementById("map-toggle-btn");
+    btn.classList.add("active");
+    btn.innerHTML = '&#128506; Cerrar Mapa';
+
+    if (!gpsAsked) {
+        // First time: show permission modal
+        document.getElementById("gps-modal").style.display = "flex";
+    } else {
+        openFullscreenMap(false);
     }
 }
 
 function acceptGpsPermission() {
     document.getElementById("gps-modal").style.display = "none";
-    gpsGranted = true;
-    openFullscreenMap();
+    gpsAsked = true;
+    openFullscreenMap(true);
 }
 
 function skipGpsPermission() {
     document.getElementById("gps-modal").style.display = "none";
-    openFullscreenMap();
-    updateGpsStatus("error", "GPS desactivado");
+    gpsAsked = true;
+    openFullscreenMap(false);
 }
 
 window.toggleMap = toggleMap;
 window.acceptGpsPermission = acceptGpsPermission;
 window.skipGpsPermission = skipGpsPermission;
 
-function openFullscreenMap() {
+// ============================================================
+// Open / close fullscreen map
+// ============================================================
+
+function openFullscreenMap(requestGps) {
     const mapSection = document.getElementById("map-section");
     mapSection.style.display = "block";
-
-    // Prevent body scroll behind map
     document.body.style.overflow = "hidden";
 
     setTimeout(() => {
@@ -115,118 +101,129 @@ function openFullscreenMap() {
         map.invalidateSize();
         updateMapMarkers();
 
-        if (gpsGranted) {
-            startGeolocation();
+        if (requestGps) {
+            requestDeviceLocation();
+        } else if (!userPosition) {
+            updateGpsStatus("", "\uD83D\uDCCD GPS desactivado");
         }
 
-        // Auto-navigate to recommended ride
+        // Auto-navigate to best ride
         const best = getBestRecommendationForMap();
         if (best) navigateToRide(best.id);
-    }, 100);
+    }, 150);
 }
 
 function closeFullscreenMap() {
-    const mapSection = document.getElementById("map-section");
-    mapSection.style.display = "none";
+    document.getElementById("map-section").style.display = "none";
     document.body.style.overflow = "";
     mapVisible = false;
     stopGeolocation();
+
+    const btn = document.getElementById("map-toggle-btn");
+    btn.classList.remove("active");
+    btn.innerHTML = '&#128506; Mapa';
 }
 
 // ============================================================
-// Map initialization
+// GPS - Request device location (works on iOS Safari + Android)
 // ============================================================
 
-function initMap() {
-    if (map) return;
-
-    map = L.map("map-container", {
-        center: PARK_CENTER,
-        zoom: PARK_ZOOM,
-        zoomControl: false,
-        attributionControl: false,
-    });
-
-    // Dark tiles
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-        maxZoom: 20,
-        subdomains: "abcd",
-    }).addTo(map);
-
-    L.control.zoom({ position: "bottomright" }).addTo(map);
-
-    L.control.attribution({ position: "bottomleft", prefix: false })
-        .addAttribution('&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>')
-        .addTo(map);
-
-    // Draw world zone circles
-    for (const [name, coords] of Object.entries(WORLD_COORDS)) {
-        if (name === "Isle of Berk") continue; // duplicate
-        const color = WORLD_MAP_COLORS[name] || "#c8a84e";
-        L.circle(coords, {
-            radius: 80,
-            color: color,
-            fillColor: color,
-            fillOpacity: 0.06,
-            weight: 1,
-            opacity: 0.3,
-            dashArray: "4,6",
-        }).addTo(map);
-
-        // World label
-        const emoji = WORLD_EMOJIS[name] || "";
-        const shortName = name.replace("Super Nintendo World", "Nintendo")
-            .replace("How to Train Your Dragon", "Dragons")
-            .replace("The Wizarding World", "Potter");
-        L.marker(coords, {
-            icon: L.divIcon({
-                className: "world-label",
-                html: `<div style="color:${color};font-size:10px;font-weight:700;text-align:center;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.8)">${emoji} ${shortName}</div>`,
-                iconSize: [100, 20],
-                iconAnchor: [50, -30],
-            }),
-            interactive: false,
-        }).addTo(map);
-    }
-}
-
-// ============================================================
-// Geolocation
-// ============================================================
-
-function startGeolocation() {
+function requestDeviceLocation() {
     if (!navigator.geolocation) {
-        updateGpsStatus("error", "GPS no disponible");
+        updateGpsStatus("error", "Tu dispositivo no soporta GPS");
         return;
     }
 
-    updateGpsStatus("", "\uD83D\uDCE1 Buscando senal GPS...");
+    updateGpsStatus("searching", "\uD83D\uDCE1 Buscando senal GPS...");
+    gpsRetryCount = 0;
+
+    // First: get a quick position (even if rough)
+    navigator.geolocation.getCurrentPosition(
+        onGpsSuccess,
+        onGpsFirstError,
+        { enableHighAccuracy: false, maximumAge: 60000, timeout: 8000 }
+    );
+
+    // Then: start watching with high accuracy
+    startHighAccuracyWatch();
+}
+
+function startHighAccuracyWatch() {
+    stopGeolocation(); // clear any previous watch
 
     watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-            userPosition = [pos.coords.latitude, pos.coords.longitude];
-            const accuracy = Math.round(pos.coords.accuracy);
-            updateGpsStatus("active", `\uD83D\uDCCD GPS activo (${accuracy}m)`);
-            updateUserMarker();
-            updateRoute();
-            updateWalkingTime();
-        },
-        (err) => {
-            console.warn("GPS error:", err.message);
-            if (err.code === 1) {
-                updateGpsStatus("error", "GPS denegado - Activalo en Ajustes");
-            } else if (err.code === 2) {
-                updateGpsStatus("error", "Senal GPS no disponible");
-            } else {
-                updateGpsStatus("error", "GPS timeout - Reintentando...");
-            }
-        },
-        {
-            enableHighAccuracy: true,
-            maximumAge: 3000,
-            timeout: 20000,
-        }
+        onGpsSuccess,
+        onGpsWatchError,
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 }
     );
+}
+
+function onGpsSuccess(pos) {
+    gpsRetryCount = 0;
+    userPosition = [pos.coords.latitude, pos.coords.longitude];
+    const acc = Math.round(pos.coords.accuracy);
+
+    let statusText;
+    if (acc <= 10) {
+        statusText = `\uD83D\uDCCD GPS preciso (${acc}m)`;
+    } else if (acc <= 30) {
+        statusText = `\uD83D\uDCCD GPS activo (${acc}m)`;
+    } else {
+        statusText = `\uD83D\uDCCD GPS aprox. (${acc}m)`;
+    }
+    updateGpsStatus("active", statusText);
+
+    updateUserMarker(pos.coords.accuracy);
+    updateRoute();
+    updateWalkingTime();
+
+    // First fix: center map on user if near the park
+    if (!userMarker._hasCentered) {
+        userMarker._hasCentered = true;
+        const distToPark = getDistance(userPosition, PARK_CENTER);
+        if (distToPark < 2000) {
+            // Within 2km of park, show user + park
+            map.fitBounds(L.latLngBounds([userPosition, PARK_CENTER]), { padding: [60, 60] });
+        }
+    }
+}
+
+function onGpsFirstError(err) {
+    console.warn("GPS getCurrentPosition error:", err.code, err.message);
+
+    if (err.code === 1) {
+        // PERMISSION_DENIED
+        updateGpsStatus("error", "GPS denegado - Activa ubicacion en Ajustes > Safari");
+        stopGeolocation();
+    } else {
+        // POSITION_UNAVAILABLE or TIMEOUT - watchPosition may still work
+        updateGpsStatus("searching", "\uD83D\uDCE1 Buscando senal GPS...");
+    }
+}
+
+function onGpsWatchError(err) {
+    console.warn("GPS watch error:", err.code, err.message);
+
+    if (err.code === 1) {
+        updateGpsStatus("error", "GPS denegado - Activa ubicacion en Ajustes");
+        stopGeolocation();
+        return;
+    }
+
+    if (err.code === 3 && gpsRetryCount < 3) {
+        // Timeout - retry
+        gpsRetryCount++;
+        updateGpsStatus("searching", `\uD83D\uDCE1 Reintentando GPS (${gpsRetryCount}/3)...`);
+        stopGeolocation();
+        setTimeout(() => startHighAccuracyWatch(), 2000);
+        return;
+    }
+
+    if (err.code === 2) {
+        updateGpsStatus("error", "No hay senal GPS - Sal al exterior");
+    } else {
+        updateGpsStatus("error", "GPS no disponible - Intenta de nuevo");
+    }
 }
 
 function stopGeolocation() {
@@ -243,7 +240,60 @@ function updateGpsStatus(state, text) {
     el.className = "map-gps-status" + (state ? ` ${state}` : "");
 }
 
-function updateUserMarker() {
+// ============================================================
+// Map initialization
+// ============================================================
+
+function initMap() {
+    if (map) return;
+
+    map = L.map("map-container", {
+        center: PARK_CENTER,
+        zoom: PARK_ZOOM,
+        zoomControl: false,
+        attributionControl: false,
+    });
+
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 20,
+        subdomains: "abcd",
+    }).addTo(map);
+
+    L.control.zoom({ position: "bottomright" }).addTo(map);
+    L.control.attribution({ position: "bottomleft", prefix: false })
+        .addAttribution('&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>')
+        .addTo(map);
+
+    // World zone circles + labels
+    for (const [name, coords] of Object.entries(WORLD_COORDS)) {
+        if (name === "Isle of Berk") continue;
+        const color = WORLD_MAP_COLORS[name] || "#c8a84e";
+
+        L.circle(coords, {
+            radius: 80, color, fillColor: color,
+            fillOpacity: 0.06, weight: 1, opacity: 0.3, dashArray: "4,6",
+        }).addTo(map);
+
+        const emoji = WORLD_EMOJIS[name] || "";
+        const short = name.replace("Super Nintendo World", "Nintendo")
+            .replace("How to Train Your Dragon", "Dragons")
+            .replace("The Wizarding World", "Potter");
+        L.marker(coords, {
+            icon: L.divIcon({
+                className: "world-label",
+                html: `<div style="color:${color};font-size:10px;font-weight:700;text-align:center;white-space:nowrap;text-shadow:0 1px 4px rgba(0,0,0,0.8)">${emoji} ${short}</div>`,
+                iconSize: [100, 20], iconAnchor: [50, -30],
+            }),
+            interactive: false,
+        }).addTo(map);
+    }
+}
+
+// ============================================================
+// User marker with accuracy circle
+// ============================================================
+
+function updateUserMarker(accuracy) {
     if (!map || !userPosition) return;
 
     if (!userMarker) {
@@ -254,8 +304,26 @@ function updateUserMarker() {
             iconAnchor: [12, 12],
         });
         userMarker = L.marker(userPosition, { icon, zIndexOffset: 1000 }).addTo(map);
+        userMarker._hasCentered = false;
     } else {
         userMarker.setLatLng(userPosition);
+    }
+
+    // Accuracy circle
+    if (accuracy && accuracy < 200) {
+        if (!accuracyCircle) {
+            accuracyCircle = L.circle(userPosition, {
+                radius: accuracy,
+                color: "#4285f4",
+                fillColor: "#4285f4",
+                fillOpacity: 0.1,
+                weight: 1,
+                opacity: 0.3,
+            }).addTo(map);
+        } else {
+            accuracyCircle.setLatLng(userPosition);
+            accuracyCircle.setRadius(accuracy);
+        }
     }
 }
 
@@ -299,10 +367,8 @@ function updateMapMarkers() {
                </div>`;
 
         const icon = L.divIcon({
-            className: "ride-marker-wrap",
-            html,
-            iconSize: [36, 36],
-            iconAnchor: [18, 18],
+            className: "ride-marker-wrap", html,
+            iconSize: [36, 36], iconAnchor: [18, 18],
         });
 
         const marker = L.marker(coords, { icon }).addTo(map);
@@ -323,7 +389,7 @@ function updateMapMarkers() {
 }
 
 // ============================================================
-// Navigation
+// Navigation / routing
 // ============================================================
 
 function navigateToRide(rideId) {
@@ -335,15 +401,13 @@ function navigateToRide(rideId) {
 
     const coords = getAttractionCoords(ride);
     if (userPosition) {
-        map.fitBounds(L.latLngBounds([userPosition, coords]), { padding: [80, 80] });
+        map.fitBounds(L.latLngBounds([userPosition, coords]), { padding: [80, 120] });
     } else {
         map.setView(coords, 18);
     }
 
     updateMapMarkers();
     updateNavPanel(ride);
-
-    // Close any open popups
     map.closePopup();
     showToast(`Navegando a ${ride.name}`);
 }
@@ -357,17 +421,14 @@ function updateRoute() {
 
     const targetCoords = getAttractionCoords(targetAttraction);
     routeLine = L.polyline([userPosition, targetCoords], {
-        color: "#c8a84e",
-        weight: 4,
-        dashArray: "10, 14",
-        opacity: 0.85,
+        color: "#c8a84e", weight: 4, dashArray: "10, 14", opacity: 0.85,
     }).addTo(map);
 }
 
 function updateWalkingTime() {
     if (!userPosition || !targetAttraction) return;
-    const targetCoords = getAttractionCoords(targetAttraction);
-    const dist = getDistance(userPosition, targetCoords);
+    const coords = getAttractionCoords(targetAttraction);
+    const dist = getDistance(userPosition, coords);
     const walkMin = Math.max(1, Math.round(dist / 70));
     const el = document.getElementById("nav-walk-time");
     if (el) el.textContent = `${walkMin} min caminando (${Math.round(dist)}m)`;
@@ -408,21 +469,21 @@ function updateNavPanel(ride) {
     } else {
         document.getElementById("nav-walk-time").textContent = "Esperando GPS...";
     }
-
     panel.style.display = "flex";
 }
 
 // ============================================================
-// Center on user
+// Center on user / retry GPS
 // ============================================================
 
 function centerOnUser() {
     if (userPosition && map) {
         map.setView(userPosition, 18, { animate: true });
-    } else if (!gpsGranted) {
-        document.getElementById("gps-modal").style.display = "flex";
+    } else if (navigator.geolocation) {
+        // Retry GPS
+        requestDeviceLocation();
     } else {
-        showToast("Esperando senal GPS...");
+        showToast("GPS no disponible");
     }
 }
 
@@ -444,16 +505,11 @@ window.onMapNeedsUpdate = function () {
     if (!mapVisible || !map) return;
     updateMapMarkers();
 
-    // Auto-update nav if target wait time changed
     if (targetAttraction) {
         const updated = attractions.find(a => a.id === targetAttraction.id);
-        if (updated) {
-            targetAttraction = updated;
-            updateNavPanel(updated);
-        }
+        if (updated) { targetAttraction = updated; updateNavPanel(updated); }
     }
 
-    // Check if a better ride appeared
     const best = getBestRecommendationForMap();
     if (best && (!targetAttraction || best.waitTime < targetAttraction.waitTime - 10)) {
         navigateToRide(best.id);

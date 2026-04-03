@@ -507,6 +507,17 @@ body::before {
     border-color: rgba(0, 230, 118, 0.3);
 }
 
+.map-gps-status.searching {
+    color: var(--orange);
+    border-color: rgba(255, 171, 0, 0.3);
+    animation: gps-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes gps-blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
 .map-gps-status.error {
     color: var(--red);
     border-color: rgba(255, 23, 68, 0.3);
