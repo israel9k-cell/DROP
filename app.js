@@ -11,12 +11,9 @@ const PARKS = {
 
 const API_BASE = "https://queue-times.com/parks";
 
-// CORS proxies (fallback chain in case one is down)
-const CORS_PROXIES = [
-    (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    (url) => url  // direct attempt last (works if CORS headers present or same-origin)
-];
+// If you deploy the Cloudflare Worker proxy (see worker/ folder), set your URL here:
+// const WORKER_PROXY = "https://universal-go-proxy.YOUR_SUBDOMAIN.workers.dev";
+const WORKER_PROXY = null;
 
 // State
 let currentPark = "islands";
@@ -28,47 +25,87 @@ let refreshInterval = null;
 let countdown = 60;
 
 // ============================================================
-// API - Fetch wait times from Queue-Times
+// API - Fetch wait times with multiple fallback strategies
 // ============================================================
 
-async function fetchWithCorsRetry(url) {
-    for (const proxyFn of CORS_PROXIES) {
+async function tryFetch(url, opts = {}) {
+    const resp = await fetch(url, opts);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp;
+}
+
+async function fetchQueueTimesData(parkId) {
+    const directUrl = `${API_BASE}/${parkId}/queue_times.json`;
+    const errors = [];
+
+    // Strategy 1: Own Cloudflare Worker proxy (most reliable if deployed)
+    if (WORKER_PROXY) {
         try {
-            const proxiedUrl = proxyFn(url);
-            const resp = await fetch(proxiedUrl);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const resp = await tryFetch(`${WORKER_PROXY}?park=${parkId}`);
             return await resp.json();
-        } catch (err) {
-            console.warn(`Proxy failed: ${err.message}, trying next...`);
+        } catch (e) { errors.push(`Worker: ${e.message}`); }
+    }
+
+    // Strategy 2: corsproxy.io
+    try {
+        const resp = await tryFetch(`https://corsproxy.io/?${encodeURIComponent(directUrl)}`);
+        return await resp.json();
+    } catch (e) { errors.push(`corsproxy.io: ${e.message}`); }
+
+    // Strategy 3: allorigins (wrapped JSON mode - more reliable than raw)
+    try {
+        const resp = await tryFetch(`https://api.allorigins.win/get?url=${encodeURIComponent(directUrl)}`);
+        const wrapper = await resp.json();
+        if (wrapper.contents) return JSON.parse(wrapper.contents);
+        throw new Error("No contents in response");
+    } catch (e) { errors.push(`allorigins: ${e.message}`); }
+
+    // Strategy 4: cors.lol
+    try {
+        const resp = await tryFetch(`https://api.cors.lol/?url=${encodeURIComponent(directUrl)}`);
+        return await resp.json();
+    } catch (e) { errors.push(`cors.lol: ${e.message}`); }
+
+    // Strategy 5: thingproxy
+    try {
+        const resp = await tryFetch(`https://thingproxy.freeboard.io/fetch/${directUrl}`);
+        return await resp.json();
+    } catch (e) { errors.push(`thingproxy: ${e.message}`); }
+
+    // Strategy 6: direct (works if same-origin or CORS enabled)
+    try {
+        const resp = await tryFetch(directUrl);
+        return await resp.json();
+    } catch (e) { errors.push(`direct: ${e.message}`); }
+
+    console.error("All fetch strategies failed:", errors);
+    throw new Error("All fetch strategies failed");
+}
+
+function parseQueueTimesResponse(data) {
+    const rides = [];
+    if (data.lands) {
+        for (const land of data.lands) {
+            for (const ride of land.rides) {
+                rides.push({
+                    id: ride.id,
+                    name: ride.name,
+                    area: land.name,
+                    waitTime: ride.is_open ? ride.wait_time : -1,
+                    isOpen: ride.is_open,
+                    lastUpdated: ride.last_updated
+                });
+            }
         }
     }
-    throw new Error("All CORS proxies failed");
+    return rides;
 }
 
 async function fetchWaitTimes(parkKey) {
     const park = PARKS[parkKey];
-    const url = `${API_BASE}/${park.id}/queue_times.json`;
-
     try {
-        const data = await fetchWithCorsRetry(url);
-
-        // The API returns { lands: [ { name, rides: [ { name, wait_time, is_open, last_updated } ] } ] }
-        const rides = [];
-        if (data.lands) {
-            for (const land of data.lands) {
-                for (const ride of land.rides) {
-                    rides.push({
-                        id: ride.id,
-                        name: ride.name,
-                        area: land.name,
-                        waitTime: ride.is_open ? ride.wait_time : -1,
-                        isOpen: ride.is_open,
-                        lastUpdated: ride.last_updated
-                    });
-                }
-            }
-        }
-        return rides;
+        const data = await fetchQueueTimesData(park.id);
+        return parseQueueTimesResponse(data);
     } catch (err) {
         console.error("Error fetching wait times:", err);
         showToast("Error al obtener datos. Reintentando...");
