@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Orlando - Guia de Atracciones</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>Universal Orlando</h1>
+                <p class="subtitle">Guia Inteligente de Atracciones</p>
+            </div>
+            <div class="park-selector">
+                <button class="park-btn active" data-park="islands">Islands of Adventure</button>
+                <button class="park-btn" data-park="studios">Universal Studios</button>
+                <button class="park-btn" data-park="epicuniverse">Epic Universe</button>
+            </div>
+        </header>
+
+        <!-- Recommendation Banner -->
+        <section class="recommendation" id="recommendation">
+            <div class="rec-icon">&#9889;</div>
+            <div class="rec-text">
+                <span class="rec-label">SIGUIENTE ATRACCION RECOMENDADA</span>
+                <h2 id="rec-name">Cargando...</h2>
+                <div class="rec-details">
+                    <span class="rec-wait" id="rec-wait">-- min</span>
+                    <span class="rec-area" id="rec-area"></span>
+                </div>
+            </div>
+            <button class="rec-go-btn" id="rec-go-btn">IR AHORA</button>
+        </section>
+
+        <!-- Stats Bar -->
+        <div class="stats-bar">
+            <div class="stat">
+                <span class="stat-number" id="stat-done">0</span>
+                <span class="stat-label">Hechas</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number" id="stat-remaining">0</span>
+                <span class="stat-label">Restantes</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number" id="stat-avg-wait">0</span>
+                <span class="stat-label">Espera Prom.</span>
+            </div>
+            <div class="stat-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="filter-tabs">
+            <button class="filter-btn active" data-filter="all">Todas</button>
+            <button class="filter-btn" data-filter="pending">Pendientes</button>
+            <button class="filter-btn" data-filter="done">Completadas</button>
+        </div>
+
+        <!-- Sort Controls -->
+        <div class="sort-controls">
+            <span class="sort-label">Ordenar:</span>
+            <button class="sort-btn active" data-sort="wait">Menor Espera</button>
+            <button class="sort-btn" data-sort="name">Nombre</button>
+            <button class="sort-btn" data-sort="area">Area</button>
+        </div>
+
+        <!-- Attractions List -->
+        <div class="attractions-list" id="attractions-list">
+            <!-- Populated by JS -->
+        </div>
+
+        <!-- Refresh Timer -->
+        <div class="refresh-bar" id="refresh-bar">
+            <span>Actualizacion automatica en <strong id="refresh-countdown">60</strong>s</span>
+            <button class="refresh-btn" id="refresh-btn">Actualizar Ahora</button>
+        </div>
+
+        <!-- Notification Toast -->
+        <div class="toast" id="toast">
+            <span id="toast-msg"></span>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
