@@ -404,8 +404,23 @@ function updateGpsStatus(state, text) {
 }
 
 // ============================================================
-// Map initialization
+// Map initialization with illustrated park overlay
 // ============================================================
+
+// Illustrated park map image URL (official Universal map hosted publicly)
+const PARK_MAP_URL = "https://www.universalorlando.com/webdata/k2/en/us/files/Documents/Images/epic-universe-park-map.jpg";
+// Fallback map URLs
+const PARK_MAP_FALLBACKS = [
+    "https://s3.amazonaws.com/cms.universalorlando.com/images/epic-universe-park-map.jpg",
+    "https://cache.undercovertourist.com/media_file/universal-epic-universe-1073767-198eeb234b6.jpg",
+];
+
+// Approximate geographic bounds where the park map image should be placed
+// These bounds cover the entire Epic Universe footprint
+const MAP_BOUNDS = [
+    [28.4365, -81.4500], // Southwest corner
+    [28.4430, -81.4430], // Northeast corner
+];
 
 function initMap() {
     if (map) return;
@@ -415,19 +430,19 @@ function initMap() {
         zoom: PARK_ZOOM,
         zoomControl: false,
         attributionControl: false,
+        maxZoom: 21,
+        minZoom: 14,
     });
 
-    // Google Maps satellite tiles
+    // Google Maps satellite base
     L.tileLayer("https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}", {
         maxZoom: 21,
-        subdomains: ["mt0", "mt1", "mt2", "mt3"],
     }).addTo(map);
 
-    // Google Maps labels overlay (roads, place names)
+    // Google Maps labels (roads, place names)
     L.tileLayer("https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}", {
         maxZoom: 21,
-        subdomains: ["mt0", "mt1", "mt2", "mt3"],
-        opacity: 0.7,
+        opacity: 0.6,
     }).addTo(map);
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -435,15 +450,13 @@ function initMap() {
         .addAttribution('&copy; Google Maps')
         .addTo(map);
 
-    // World zone circles + labels
+    // Draw detailed park zones with colored polygons
+    drawParkZones();
+
+    // World labels
     for (const [name, coords] of Object.entries(WORLD_COORDS)) {
         if (name === "Isle of Berk") continue;
         const color = WORLD_MAP_COLORS[name] || "#c8a84e";
-
-        L.circle(coords, {
-            radius: 80, color, fillColor: color,
-            fillOpacity: 0.06, weight: 1, opacity: 0.3, dashArray: "4,6",
-        }).addTo(map);
 
         const emoji = WORLD_EMOJIS[name] || "";
         const short = name.replace("Super Nintendo World", "Nintendo")
@@ -452,12 +465,107 @@ function initMap() {
         L.marker(coords, {
             icon: L.divIcon({
                 className: "world-label",
-                html: `<div style="color:${color};font-size:11px;font-weight:700;text-align:center;white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,1),0 0 12px rgba(0,0,0,0.8),0 1px 3px rgba(0,0,0,1);letter-spacing:0.5px">${emoji} ${short}</div>`,
-                iconSize: [100, 20], iconAnchor: [50, -30],
+                html: `<div style="color:${color};font-size:12px;font-weight:700;text-align:center;white-space:nowrap;text-shadow:0 0 6px rgba(0,0,0,1),0 0 12px rgba(0,0,0,0.8),0 1px 3px rgba(0,0,0,1);letter-spacing:0.5px">${emoji} ${short}</div>`,
+                iconSize: [120, 24], iconAnchor: [60, -15],
             }),
             interactive: false,
         }).addTo(map);
     }
+}
+
+// Draw colored park zones as polygons over the satellite imagery
+function drawParkZones() {
+    const zones = [
+        {
+            name: "Celestial Park",
+            color: "#c8a84e",
+            // Center hub - circular area
+            coords: [
+                [28.4403, -81.4473], [28.4406, -81.4469],
+                [28.4405, -81.4462], [28.4402, -81.4458],
+                [28.4397, -81.4456], [28.4392, -81.4457],
+                [28.4389, -81.4461], [28.4388, -81.4467],
+                [28.4390, -81.4473], [28.4394, -81.4476],
+                [28.4399, -81.4476],
+            ]
+        },
+        {
+            name: "Super Nintendo World",
+            color: "#e60012",
+            // Southwest area
+            coords: [
+                [28.4389, -81.4476], [28.4394, -81.4476],
+                [28.4396, -81.4479], [28.4394, -81.4490],
+                [28.4390, -81.4495], [28.4382, -81.4495],
+                [28.4378, -81.4490], [28.4378, -81.4480],
+                [28.4382, -81.4476],
+            ]
+        },
+        {
+            name: "Dark Universe",
+            color: "#6a6a8e",
+            // Northwest area
+            coords: [
+                [28.4403, -81.4476], [28.4406, -81.4473],
+                [28.4410, -81.4477], [28.4415, -81.4483],
+                [28.4418, -81.4490], [28.4415, -81.4495],
+                [28.4408, -81.4495], [28.4404, -81.4490],
+                [28.4401, -81.4482],
+            ]
+        },
+        {
+            name: "Wizarding World",
+            color: "#5c2d91",
+            // Northeast area
+            coords: [
+                [28.4405, -81.4462], [28.4406, -81.4458],
+                [28.4410, -81.4453], [28.4415, -81.4448],
+                [28.4418, -81.4443], [28.4418, -81.4437],
+                [28.4412, -81.4435], [28.4406, -81.4440],
+                [28.4402, -81.4448], [28.4402, -81.4456],
+            ]
+        },
+        {
+            name: "Isle of Berk",
+            color: "#e65100",
+            // Southeast area
+            coords: [
+                [28.4392, -81.4457], [28.4396, -81.4456],
+                [28.4398, -81.4450], [28.4396, -81.4443],
+                [28.4392, -81.4438], [28.4385, -81.4436],
+                [28.4380, -81.4440], [28.4379, -81.4448],
+                [28.4382, -81.4455], [28.4387, -81.4458],
+            ]
+        },
+    ];
+
+    zones.forEach(zone => {
+        L.polygon(zone.coords, {
+            color: zone.color,
+            fillColor: zone.color,
+            fillOpacity: 0.20,
+            weight: 2,
+            opacity: 0.7,
+        }).addTo(map);
+    });
+
+    // Draw pathways connecting zones (Celestial Park spokes)
+    const pathStyle = { color: "#c8a84e", weight: 2, opacity: 0.4, dashArray: "6,8" };
+    const center = WORLD_COORDS["Celestial Park"];
+    ["Super Nintendo World", "Dark Universe", "The Wizarding World", "How to Train Your Dragon"].forEach(name => {
+        L.polyline([center, WORLD_COORDS[name]], pathStyle).addTo(map);
+    });
+
+    // Park entrance marker
+    const entranceCoords = [28.4375, -81.4465];
+    L.marker(entranceCoords, {
+        icon: L.divIcon({
+            className: "world-label",
+            html: '<div style="color:#f5d76e;font-size:13px;font-weight:900;text-align:center;text-shadow:0 0 8px rgba(0,0,0,1),0 0 16px rgba(0,0,0,0.9);letter-spacing:1px">ENTRADA</div>',
+            iconSize: [100, 24], iconAnchor: [50, 12],
+        }),
+        interactive: false,
+    }).addTo(map);
 }
 
 // ============================================================
