@@ -11,9 +11,8 @@ const PARKS = {
 
 const API_BASE = "https://queue-times.com/parks";
 
-// If you deploy the Cloudflare Worker proxy (see worker/ folder), set your URL here:
-// const WORKER_PROXY = "https://universal-go-proxy.YOUR_SUBDOMAIN.workers.dev";
-const WORKER_PROXY = null;
+// Detect if running from Node server (has /api/waits) or static hosting
+const LOCAL_API = `${window.location.origin}/api/waits`;
 
 // State
 let currentPark = "islands";
@@ -23,13 +22,14 @@ let currentFilter = "all";
 let currentSort = "wait";
 let refreshInterval = null;
 let countdown = 60;
+let useLocalProxy = true; // will flip to false if local proxy not available
 
 // ============================================================
-// API - Fetch wait times with multiple fallback strategies
+// API - Fetch wait times (local proxy -> CORS fallbacks)
 // ============================================================
 
-async function tryFetch(url, opts = {}) {
-    const resp = await fetch(url, opts);
+async function tryFetch(url) {
+    const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp;
 }
@@ -38,12 +38,16 @@ async function fetchQueueTimesData(parkId) {
     const directUrl = `${API_BASE}/${parkId}/queue_times.json`;
     const errors = [];
 
-    // Strategy 1: Own Cloudflare Worker proxy (most reliable if deployed)
-    if (WORKER_PROXY) {
+    // Strategy 1: Local server proxy (same-origin, no CORS issues)
+    if (useLocalProxy) {
         try {
-            const resp = await tryFetch(`${WORKER_PROXY}?park=${parkId}`);
+            const resp = await tryFetch(`${LOCAL_API}?park=${parkId}`);
             return await resp.json();
-        } catch (e) { errors.push(`Worker: ${e.message}`); }
+        } catch (e) {
+            errors.push(`local: ${e.message}`);
+            useLocalProxy = false; // don't try again
+            console.warn("Local proxy not available, falling back to CORS proxies");
+        }
     }
 
     // Strategy 2: corsproxy.io
@@ -52,12 +56,12 @@ async function fetchQueueTimesData(parkId) {
         return await resp.json();
     } catch (e) { errors.push(`corsproxy.io: ${e.message}`); }
 
-    // Strategy 3: allorigins (wrapped JSON mode - more reliable than raw)
+    // Strategy 3: allorigins (wrapped JSON)
     try {
         const resp = await tryFetch(`https://api.allorigins.win/get?url=${encodeURIComponent(directUrl)}`);
         const wrapper = await resp.json();
         if (wrapper.contents) return JSON.parse(wrapper.contents);
-        throw new Error("No contents in response");
+        throw new Error("No contents");
     } catch (e) { errors.push(`allorigins: ${e.message}`); }
 
     // Strategy 4: cors.lol
@@ -72,13 +76,13 @@ async function fetchQueueTimesData(parkId) {
         return await resp.json();
     } catch (e) { errors.push(`thingproxy: ${e.message}`); }
 
-    // Strategy 6: direct (works if same-origin or CORS enabled)
+    // Strategy 6: direct
     try {
         const resp = await tryFetch(directUrl);
         return await resp.json();
     } catch (e) { errors.push(`direct: ${e.message}`); }
 
-    console.error("All fetch strategies failed:", errors);
+    console.error("All strategies failed:", errors);
     throw new Error("All fetch strategies failed");
 }
 
