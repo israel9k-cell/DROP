@@ -10,6 +10,9 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
     <title>Epic Universe - Guia de Atracciones</title>
+    <!-- Leaflet.js for map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -59,6 +62,31 @@
                 <span>&#128009;</span> Dragon
             </button>
         </div>
+
+        <!-- Map Toggle Button -->
+        <div class="map-toggle-bar">
+            <button class="map-toggle-btn" id="map-toggle-btn" onclick="toggleMap()">
+                &#128506; Mapa
+            </button>
+        </div>
+
+        <!-- Map Section (hidden by default) -->
+        <section class="map-section" id="map-section" style="display:none">
+            <div id="map-container"></div>
+            <button class="map-center-btn" onclick="centerOnUser()">&#127919;</button>
+            <!-- Navigation Panel -->
+            <div class="nav-panel" id="nav-panel" style="display:none">
+                <div class="nav-info">
+                    <div class="nav-ride-name" id="nav-ride-name">---</div>
+                    <div class="nav-ride-area" id="nav-ride-area">---</div>
+                    <div class="nav-walk-time" id="nav-walk-time">---</div>
+                </div>
+                <div class="nav-wait-box">
+                    <span class="nav-wait" id="nav-ride-wait">--</span>
+                    <span class="nav-wait-label">espera</span>
+                </div>
+            </div>
+        </section>
 
         <!-- Recommendation Banner -->
         <section class="recommendation" id="recommendation">
@@ -133,5 +161,6 @@
     </div>
 
     <script src="app.js"></script>
+    <script src="map.js"></script>
 </body>
 </html>

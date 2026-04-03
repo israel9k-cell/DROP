@@ -1,5 +1,5 @@
-const CACHE_NAME = "epic-go-v1";
-const ASSETS = ["/index.html", "/styles.css", "/app.js", "/manifest.json"];
+const CACHE_NAME = "epic-go-v2";
+const ASSETS = ["/index.html", "/styles.css", "/app.js", "/map.js", "/manifest.json"];
 
 self.addEventListener("install", (e) => {
     e.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(ASSETS)));

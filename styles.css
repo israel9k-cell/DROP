@@ -404,6 +404,239 @@ body::before {
     color: var(--gold);
 }
 
+/* ============ Map ============ */
+.map-toggle-bar {
+    padding: 0 12px 4px;
+}
+
+.map-toggle-btn {
+    width: 100%;
+    background: linear-gradient(135deg, rgba(200, 168, 78, 0.1), rgba(200, 168, 78, 0.05));
+    border: 1px solid rgba(200, 168, 78, 0.25);
+    color: var(--gold);
+    padding: 10px;
+    border-radius: 12px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.map-toggle-btn.active {
+    background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+    color: #0b0e2a;
+    border-color: var(--gold);
+}
+
+.map-section {
+    position: relative;
+    margin: 0 12px 8px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid rgba(200, 168, 78, 0.2);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+#map-container {
+    height: 320px;
+    width: 100%;
+    background: var(--bg-deep);
+}
+
+.map-center-btn {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1000;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+
+/* Nav panel at bottom of map */
+.nav-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: linear-gradient(180deg, rgba(15, 21, 53, 0.95), rgba(6, 9, 24, 0.98));
+    backdrop-filter: blur(10px);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-top: 1px solid rgba(200, 168, 78, 0.2);
+}
+
+.nav-info { flex: 1; min-width: 0; }
+
+.nav-ride-name {
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nav-ride-area {
+    font-size: 11px;
+    margin-top: 1px;
+}
+
+.nav-walk-time {
+    font-size: 11px;
+    color: var(--gold);
+    margin-top: 3px;
+    font-weight: 600;
+}
+
+.nav-wait-box {
+    text-align: center;
+    flex-shrink: 0;
+    background: rgba(200, 168, 78, 0.1);
+    padding: 6px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(200, 168, 78, 0.2);
+}
+
+.nav-wait {
+    display: block;
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.nav-wait-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+/* Map markers */
+.user-marker { background: none !important; border: none !important; }
+
+.user-dot {
+    position: relative;
+    width: 24px;
+    height: 24px;
+}
+
+.user-dot-inner {
+    position: absolute;
+    top: 6px; left: 6px;
+    width: 12px;
+    height: 12px;
+    background: #4285f4;
+    border: 2px solid white;
+    border-radius: 50%;
+    z-index: 2;
+    box-shadow: 0 0 6px rgba(66, 133, 244, 0.6);
+}
+
+.user-pulse {
+    position: absolute;
+    top: 0; left: 0;
+    width: 24px;
+    height: 24px;
+    background: rgba(66, 133, 244, 0.25);
+    border-radius: 50%;
+    animation: user-pulse-anim 2s ease-out infinite;
+}
+
+@keyframes user-pulse-anim {
+    0% { transform: scale(0.8); opacity: 1; }
+    100% { transform: scale(2.5); opacity: 0; }
+}
+
+.ride-marker-wrap { background: none !important; border: none !important; }
+
+.map-marker {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 900;
+    color: white;
+    border: 2px solid;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transition: transform 0.3s;
+}
+
+.map-marker .marker-wait {
+    font-family: 'Poppins', sans-serif;
+    font-size: 11px;
+}
+
+.done-marker {
+    background: rgba(13, 26, 14, 0.8) !important;
+    color: var(--green);
+    opacity: 0.6;
+}
+
+.target-marker {
+    transform: scale(1.3);
+    box-shadow: 0 0 16px rgba(200, 168, 78, 0.5);
+    animation: target-bounce 1s ease-in-out infinite;
+}
+
+@keyframes target-bounce {
+    0%, 100% { transform: scale(1.3); }
+    50% { transform: scale(1.45); }
+}
+
+/* Leaflet popup override */
+.dark-popup .leaflet-popup-content-wrapper {
+    background: rgba(15, 21, 53, 0.95);
+    color: var(--text);
+    border-radius: 12px;
+    border: 1px solid rgba(200, 168, 78, 0.2);
+    font-family: 'Poppins', sans-serif;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.dark-popup .leaflet-popup-tip {
+    background: rgba(15, 21, 53, 0.95);
+}
+
+.dark-popup .leaflet-popup-content {
+    margin: 10px 14px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.popup-wait {
+    color: var(--gold-bright);
+    font-weight: 700;
+}
+
+.popup-nav-btn {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+    color: #0b0e2a;
+    border: none;
+    padding: 6px;
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    cursor: pointer;
+}
+
 /* ============ Attraction Cards ============ */
 .attractions-list {
     padding: 4px 12px;

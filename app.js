@@ -203,6 +203,9 @@ function renderAttractions() {
 
     updateStats();
     updateRecommendation();
+
+    // Notify map if open
+    if (typeof window.onMapNeedsUpdate === "function") window.onMapNeedsUpdate();
 }
 
 function updateStats() {
