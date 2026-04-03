@@ -38,6 +38,7 @@ const WORLD_EMOJIS = {
 // State
 let map = null;
 let userMarker = null;
+let headingMarker = null;
 let accuracyCircle = null;
 let routeLine = null;
 let attractionMarkers = [];
@@ -47,6 +48,63 @@ let mapVisible = false;
 let targetAttraction = null;
 let gpsAsked = false;
 let gpsRetryCount = 0;
+
+// Kalman filter state for GPS smoothing
+let kalman = null;
+
+// Position history for heading calculation
+let posHistory = [];
+
+// ============================================================
+// Kalman Filter - smooths GPS noise for precise positioning
+// ============================================================
+
+class KalmanFilter {
+    constructor() {
+        this.lat = null;
+        this.lng = null;
+        this.variance = -1; // uninitialized
+        // Process noise: how much we expect position to change per second
+        // (walking speed ~1.4 m/s => ~0.0000126 degrees/s)
+        this.qMetersPerSecond = 1.5;
+        this.timestamp = null;
+    }
+
+    // accuracy in meters
+    update(lat, lng, accuracy, timestamp) {
+        if (this.variance < 0) {
+            // First reading - initialize
+            this.lat = lat;
+            this.lng = lng;
+            this.variance = accuracy * accuracy;
+            this.timestamp = timestamp;
+            return { lat, lng };
+        }
+
+        // Time delta in seconds
+        const dt = (timestamp - this.timestamp) / 1000;
+        if (dt <= 0) return { lat: this.lat, lng: this.lng };
+        this.timestamp = timestamp;
+
+        // Predict step: increase variance based on time elapsed
+        this.variance += dt * this.qMetersPerSecond * this.qMetersPerSecond;
+
+        // Update step: Kalman gain
+        const measurementVariance = accuracy * accuracy;
+        const K = this.variance / (this.variance + measurementVariance);
+
+        // Apply gain
+        this.lat += K * (lat - this.lat);
+        this.lng += K * (lng - this.lng);
+        this.variance *= (1 - K);
+
+        return { lat: this.lat, lng: this.lng };
+    }
+
+    getAccuracy() {
+        return this.variance > 0 ? Math.sqrt(this.variance) : 999;
+    }
+}
 
 // ============================================================
 // Toggle map - always show GPS modal first time
@@ -118,6 +176,7 @@ function closeFullscreenMap() {
     document.body.style.overflow = "";
     mapVisible = false;
     stopGeolocation();
+    stopCompass();
 
     const btn = document.getElementById("map-toggle-btn");
     btn.classList.remove("active");
@@ -125,7 +184,7 @@ function closeFullscreenMap() {
 }
 
 // ============================================================
-// GPS - Request device location (works on iOS Safari + Android)
+// GPS - High precision with Kalman filtering + heading
 // ============================================================
 
 function requestDeviceLocation() {
@@ -134,69 +193,171 @@ function requestDeviceLocation() {
         return;
     }
 
-    updateGpsStatus("searching", "\uD83D\uDCE1 Buscando senal GPS...");
+    // Reset filter for fresh session
+    kalman = new KalmanFilter();
+    posHistory = [];
     gpsRetryCount = 0;
 
-    // First: get a quick position (even if rough)
+    updateGpsStatus("searching", "\uD83D\uDCE1 Buscando senal GPS...");
+
+    // Phase 1: Quick coarse fix (cached OK, fast response)
     navigator.geolocation.getCurrentPosition(
-        onGpsSuccess,
+        onGpsRawReading,
         onGpsFirstError,
-        { enableHighAccuracy: false, maximumAge: 60000, timeout: 8000 }
+        { enableHighAccuracy: false, maximumAge: 30000, timeout: 8000 }
     );
 
-    // Then: start watching with high accuracy
-    startHighAccuracyWatch();
+    // Phase 2: High accuracy continuous watch (fresh readings only)
+    startPreciseWatch();
+
+    // Listen to device compass if available (iOS)
+    startCompass();
 }
 
-function startHighAccuracyWatch() {
-    stopGeolocation(); // clear any previous watch
+function startPreciseWatch() {
+    stopGeolocation();
 
     watchId = navigator.geolocation.watchPosition(
-        onGpsSuccess,
+        onGpsRawReading,
         onGpsWatchError,
-        { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 }
+        {
+            enableHighAccuracy: true,
+            maximumAge: 0,        // Force fresh readings, no cache
+            timeout: 15000,
+        }
     );
 }
 
-function onGpsSuccess(pos) {
+function onGpsRawReading(pos) {
     gpsRetryCount = 0;
-    userPosition = [pos.coords.latitude, pos.coords.longitude];
-    const acc = Math.round(pos.coords.accuracy);
+    const rawLat = pos.coords.latitude;
+    const rawLng = pos.coords.longitude;
+    const rawAcc = pos.coords.accuracy;
+    const ts = pos.timestamp || Date.now();
+    const speed = pos.coords.speed;       // m/s or null
+    const heading = pos.coords.heading;   // degrees or null
 
-    let statusText;
-    if (acc <= 10) {
-        statusText = `\uD83D\uDCCD GPS preciso (${acc}m)`;
-    } else if (acc <= 30) {
-        statusText = `\uD83D\uDCCD GPS activo (${acc}m)`;
-    } else {
-        statusText = `\uD83D\uDCCD GPS aprox. (${acc}m)`;
+    // Discard very inaccurate readings (> 100m)
+    if (rawAcc > 100) {
+        updateGpsStatus("searching", `\uD83D\uDCE1 Mejorando precision (${Math.round(rawAcc)}m)...`);
+        return;
     }
-    updateGpsStatus("active", statusText);
 
-    updateUserMarker(pos.coords.accuracy);
+    // Apply Kalman filter
+    const filtered = kalman.update(rawLat, rawLng, rawAcc, ts);
+    const filteredAcc = Math.round(kalman.getAccuracy());
+
+    userPosition = [filtered.lat, filtered.lng];
+
+    // Track position history for movement-based heading
+    posHistory.push({ lat: filtered.lat, lng: filtered.lng, ts });
+    if (posHistory.length > 10) posHistory.shift();
+
+    // Calculate heading from movement if GPS heading not available
+    let userHeading = null;
+    if (heading !== null && !isNaN(heading) && speed > 0.3) {
+        userHeading = heading;
+    } else if (posHistory.length >= 3) {
+        userHeading = calcMovementHeading();
+    }
+
+    // Status
+    let statusText, statusState;
+    if (filteredAcc <= 8) {
+        statusText = `\uD83C\uDFAF GPS preciso (${filteredAcc}m)`;
+        statusState = "active";
+    } else if (filteredAcc <= 20) {
+        statusText = `\uD83D\uDCCD GPS bueno (${filteredAcc}m)`;
+        statusState = "active";
+    } else if (filteredAcc <= 50) {
+        statusText = `\uD83D\uDCCD GPS activo (${filteredAcc}m)`;
+        statusState = "active";
+    } else {
+        statusText = `\uD83D\uDCE1 GPS aprox. (${filteredAcc}m)`;
+        statusState = "searching";
+    }
+    updateGpsStatus(statusState, statusText);
+
+    // Update visuals
+    updateUserMarker(filteredAcc, userHeading);
     updateRoute();
     updateWalkingTime();
 
-    // First fix: center map on user if near the park
-    if (!userMarker._hasCentered) {
+    // First fix: center map on user
+    if (userMarker && !userMarker._hasCentered) {
         userMarker._hasCentered = true;
         const distToPark = getDistance(userPosition, PARK_CENTER);
         if (distToPark < 2000) {
-            // Within 2km of park, show user + park
             map.fitBounds(L.latLngBounds([userPosition, PARK_CENTER]), { padding: [60, 60] });
         }
     }
 }
 
+function calcMovementHeading() {
+    // Use last few positions to determine direction of travel
+    if (posHistory.length < 3) return null;
+    const recent = posHistory.slice(-3);
+    const first = recent[0];
+    const last = recent[recent.length - 1];
+
+    const dist = getDistance([first.lat, first.lng], [last.lat, last.lng]);
+    if (dist < 2) return null; // Not enough movement
+
+    const dLat = last.lat - first.lat;
+    const dLng = last.lng - first.lng;
+    let angle = Math.atan2(dLng, dLat) * 180 / Math.PI;
+    if (angle < 0) angle += 360;
+    return angle;
+}
+
+// ============================================================
+// Device compass (iOS DeviceOrientation)
+// ============================================================
+
+let deviceHeading = null;
+
+function startCompass() {
+    // iOS 13+ requires permission for DeviceOrientation
+    if (typeof DeviceOrientationEvent !== "undefined" &&
+        typeof DeviceOrientationEvent.requestPermission === "function") {
+        DeviceOrientationEvent.requestPermission()
+            .then(state => {
+                if (state === "granted") {
+                    window.addEventListener("deviceorientationabsolute", onCompass, true);
+                    window.addEventListener("deviceorientation", onCompass, true);
+                }
+            })
+            .catch(() => {});
+    } else {
+        window.addEventListener("deviceorientationabsolute", onCompass, true);
+        window.addEventListener("deviceorientation", onCompass, true);
+    }
+}
+
+function stopCompass() {
+    window.removeEventListener("deviceorientationabsolute", onCompass, true);
+    window.removeEventListener("deviceorientation", onCompass, true);
+}
+
+function onCompass(e) {
+    // webkitCompassHeading for iOS, alpha for Android
+    if (e.webkitCompassHeading !== undefined) {
+        deviceHeading = e.webkitCompassHeading;
+    } else if (e.alpha !== null) {
+        deviceHeading = 360 - e.alpha;
+    }
+}
+
+// ============================================================
+// Error handling with retry
+// ============================================================
+
 function onGpsFirstError(err) {
     console.warn("GPS getCurrentPosition error:", err.code, err.message);
-
     if (err.code === 1) {
-        // PERMISSION_DENIED
         updateGpsStatus("error", "GPS denegado - Activa ubicacion en Ajustes > Safari");
         stopGeolocation();
     } else {
-        // POSITION_UNAVAILABLE or TIMEOUT - watchPosition may still work
         updateGpsStatus("searching", "\uD83D\uDCE1 Buscando senal GPS...");
     }
 }
@@ -210,19 +371,18 @@ function onGpsWatchError(err) {
         return;
     }
 
-    if (err.code === 3 && gpsRetryCount < 3) {
-        // Timeout - retry
+    if (err.code === 3 && gpsRetryCount < 5) {
         gpsRetryCount++;
-        updateGpsStatus("searching", `\uD83D\uDCE1 Reintentando GPS (${gpsRetryCount}/3)...`);
+        updateGpsStatus("searching", `\uD83D\uDCE1 Reintentando GPS (${gpsRetryCount}/5)...`);
         stopGeolocation();
-        setTimeout(() => startHighAccuracyWatch(), 2000);
+        setTimeout(() => startPreciseWatch(), 1500);
         return;
     }
 
     if (err.code === 2) {
         updateGpsStatus("error", "No hay senal GPS - Sal al exterior");
     } else {
-        updateGpsStatus("error", "GPS no disponible - Intenta de nuevo");
+        updateGpsStatus("error", "GPS timeout - Toca la diana para reintentar");
     }
 }
 
@@ -290,41 +450,63 @@ function initMap() {
 }
 
 // ============================================================
-// User marker with accuracy circle
+// User marker with accuracy circle + heading arrow
 // ============================================================
 
-function updateUserMarker(accuracy) {
+function updateUserMarker(accuracy, heading) {
     if (!map || !userPosition) return;
+
+    // Use GPS heading > movement heading > compass heading
+    const finalHeading = heading !== null ? heading : deviceHeading;
 
     if (!userMarker) {
         const icon = L.divIcon({
             className: "user-marker",
-            html: '<div class="user-dot"><div class="user-dot-inner"></div><div class="user-pulse"></div></div>',
-            iconSize: [24, 24],
-            iconAnchor: [12, 12],
+            html: buildUserMarkerHtml(finalHeading),
+            iconSize: [48, 48],
+            iconAnchor: [24, 24],
         });
         userMarker = L.marker(userPosition, { icon, zIndexOffset: 1000 }).addTo(map);
         userMarker._hasCentered = false;
     } else {
         userMarker.setLatLng(userPosition);
+        // Update heading arrow
+        const el = userMarker.getElement();
+        if (el) el.innerHTML = buildUserMarkerHtml(finalHeading);
     }
 
-    // Accuracy circle
-    if (accuracy && accuracy < 200) {
+    // Accuracy circle (only show if > 10m, otherwise clutters)
+    if (accuracy && accuracy > 10 && accuracy < 150) {
         if (!accuracyCircle) {
             accuracyCircle = L.circle(userPosition, {
                 radius: accuracy,
-                color: "#4285f4",
-                fillColor: "#4285f4",
-                fillOpacity: 0.1,
-                weight: 1,
-                opacity: 0.3,
+                color: "#4285f4", fillColor: "#4285f4",
+                fillOpacity: 0.08, weight: 1, opacity: 0.25,
             }).addTo(map);
         } else {
             accuracyCircle.setLatLng(userPosition);
             accuracyCircle.setRadius(accuracy);
         }
+    } else if (accuracyCircle && accuracy <= 10) {
+        // Very precise - hide accuracy circle
+        map.removeLayer(accuracyCircle);
+        accuracyCircle = null;
     }
+}
+
+function buildUserMarkerHtml(heading) {
+    const arrowHtml = heading !== null
+        ? `<div class="user-heading" style="transform:rotate(${heading}deg)">
+               <div class="user-heading-cone"></div>
+           </div>`
+        : '';
+    return `
+        <div class="user-dot-wrap">
+            ${arrowHtml}
+            <div class="user-dot-outer"></div>
+            <div class="user-dot-inner"></div>
+            <div class="user-pulse"></div>
+        </div>`;
 }
 
 // ============================================================

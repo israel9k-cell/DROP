@@ -1,4 +1,4 @@
-const CACHE_NAME = "epic-go-v4";
+const CACHE_NAME = "epic-go-v5";
 const ASSETS = ["/index.html", "/styles.css", "/app.js", "/map.js", "/manifest.json"];
 
 self.addEventListener("install", (e) => {

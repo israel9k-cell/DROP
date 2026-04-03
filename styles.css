@@ -674,40 +674,74 @@ body::before {
     text-transform: uppercase;
 }
 
-/* Map markers */
+/* Map markers - User position */
 .user-marker { background: none !important; border: none !important; }
 
-.user-dot {
+.user-dot-wrap {
     position: relative;
-    width: 24px;
-    height: 24px;
+    width: 48px;
+    height: 48px;
+}
+
+.user-dot-outer {
+    position: absolute;
+    top: 17px; left: 17px;
+    width: 14px;
+    height: 14px;
+    background: #4285f4;
+    border: 2.5px solid white;
+    border-radius: 50%;
+    z-index: 3;
+    box-shadow: 0 0 8px rgba(66, 133, 244, 0.7);
 }
 
 .user-dot-inner {
     position: absolute;
-    top: 6px; left: 6px;
-    width: 12px;
-    height: 12px;
-    background: #4285f4;
-    border: 2px solid white;
+    top: 21px; left: 21px;
+    width: 6px;
+    height: 6px;
+    background: white;
     border-radius: 50%;
-    z-index: 2;
-    box-shadow: 0 0 6px rgba(66, 133, 244, 0.6);
+    z-index: 4;
 }
 
 .user-pulse {
     position: absolute;
-    top: 0; left: 0;
+    top: 12px; left: 12px;
     width: 24px;
     height: 24px;
     background: rgba(66, 133, 244, 0.25);
     border-radius: 50%;
+    z-index: 1;
     animation: user-pulse-anim 2s ease-out infinite;
 }
 
 @keyframes user-pulse-anim {
     0% { transform: scale(0.8); opacity: 1; }
     100% { transform: scale(2.5); opacity: 0; }
+}
+
+/* Heading cone (direction arrow) */
+.user-heading {
+    position: absolute;
+    top: 0; left: 0;
+    width: 48px;
+    height: 48px;
+    z-index: 2;
+    transition: transform 0.3s ease;
+}
+
+.user-heading-cone {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 22px solid rgba(66, 133, 244, 0.45);
+    filter: blur(1px);
 }
 
 .ride-marker-wrap { background: none !important; border: none !important; }
