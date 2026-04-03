@@ -4,6 +4,10 @@
     "description": "Universal Orlando - Guia Inteligente de Atracciones con tiempos de espera en tiempo real",
     "main": "server.js",
     "scripts": {
-        "start": "node server.js"
+        "start": "node server.js",
+        "dev": "node server.js"
+    },
+    "engines": {
+        "node": ">=18"
     }
 }

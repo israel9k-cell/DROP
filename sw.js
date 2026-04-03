@@ -1,4 +1,4 @@
-const CACHE_NAME = "universal-go-v5";
+const CACHE_NAME = "universal-go-v6";
 const ASSETS = ["/index.html", "/styles.css", "/app.js", "/manifest.json"];
 
 self.addEventListener("install", (e) => {
