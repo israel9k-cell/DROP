@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1a0a00">
+    <title>TimeLens - Cámara del Pasado</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div id="splash" class="splash">
+        <div class="splash-content">
+            <div class="lens-icon">📷</div>
+            <h1>TimeLens</h1>
+            <p>Cámara del Pasado</p>
+            <div class="loading-bar"><div class="loading-fill"></div></div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="app hidden">
+        <!-- Camera View -->
+        <div id="camera-view" class="camera-view">
+            <video id="camera-feed" autoplay playsinline muted></video>
+            <canvas id="preview-canvas" class="hidden"></canvas>
+
+            <!-- Top Controls -->
+            <div class="top-bar">
+                <button id="btn-flash" class="icon-btn" title="Flash">⚡</button>
+                <div class="era-selector">
+                    <button id="btn-era" class="era-btn">
+                        <span id="era-label">1920s</span>
+                        <span class="era-arrow">▼</span>
+                    </button>
+                </div>
+                <button id="btn-switch-cam" class="icon-btn" title="Cambiar cámara">🔄</button>
+            </div>
+
+            <!-- Era Picker (hidden by default) -->
+            <div id="era-picker" class="era-picker hidden">
+                <div class="era-option selected" data-era="1850">
+                    <span class="era-emoji">🎩</span>
+                    <span class="era-name">1850s</span>
+                    <span class="era-desc">Daguerrotipo</span>
+                </div>
+                <div class="era-option" data-era="1900">
+                    <span class="era-emoji">🚂</span>
+                    <span class="era-name">1900s</span>
+                    <span class="era-desc">Sepia clásico</span>
+                </div>
+                <div class="era-option" data-era="1920">
+                    <span class="era-emoji">🎭</span>
+                    <span class="era-name">1920s</span>
+                    <span class="era-desc">Cine mudo</span>
+                </div>
+                <div class="era-option" data-era="1950">
+                    <span class="era-emoji">🚗</span>
+                    <span class="era-name">1950s</span>
+                    <span class="era-desc">Blanco y negro</span>
+                </div>
+                <div class="era-option" data-era="1970">
+                    <span class="era-emoji">✌️</span>
+                    <span class="era-name">1970s</span>
+                    <span class="era-desc">Polaroid retro</span>
+                </div>
+                <div class="era-option" data-era="1990">
+                    <span class="era-emoji">📼</span>
+                    <span class="era-name">1990s</span>
+                    <span class="era-desc">Cámara desechable</span>
+                </div>
+            </div>
+
+            <!-- Bottom Controls -->
+            <div class="bottom-bar">
+                <button id="btn-gallery" class="gallery-btn">
+                    <div id="gallery-thumb" class="gallery-thumb"></div>
+                </button>
+                <button id="btn-capture" class="capture-btn">
+                    <div class="capture-inner"></div>
+                </button>
+                <button id="btn-upload" class="icon-btn upload-btn" title="Subir foto">📁</button>
+                <input type="file" id="file-input" accept="image/*" class="hidden">
+            </div>
+        </div>
+
+        <!-- Result View -->
+        <div id="result-view" class="result-view hidden">
+            <div class="result-header">
+                <button id="btn-back" class="icon-btn">←</button>
+                <span class="result-title">Foto del Pasado</span>
+                <button id="btn-save" class="icon-btn">💾</button>
+            </div>
+            <div class="result-container">
+                <canvas id="result-canvas"></canvas>
+                <div id="date-stamp" class="date-stamp"></div>
+            </div>
+            <div class="result-actions">
+                <button id="btn-share" class="action-btn">Compartir</button>
+                <button id="btn-retake" class="action-btn secondary">Nueva Foto</button>
+            </div>
+        </div>
+
+        <!-- Gallery View -->
+        <div id="gallery-view" class="gallery-view hidden">
+            <div class="gallery-header">
+                <button id="btn-gallery-back" class="icon-btn">←</button>
+                <span class="gallery-title">Mi Colección</span>
+                <button id="btn-clear-gallery" class="icon-btn">🗑️</button>
+            </div>
+            <div id="gallery-grid" class="gallery-grid"></div>
+            <div id="gallery-empty" class="gallery-empty hidden">
+                <span class="empty-icon">📷</span>
+                <p>Aún no has tomado fotos</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
