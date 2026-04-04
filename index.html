@@ -39,6 +39,7 @@
         <!-- ===== CAMERA VIEW ===== -->
         <div id="camera-view" class="camera-view">
             <video id="camera-feed" autoplay playsinline muted></video>
+            <div id="dream-overlay" class="dream-overlay"></div>
             <canvas id="preview-canvas" class="hidden"></canvas>
 
             <!-- Top Bar -->
@@ -104,6 +105,21 @@
                         <div class="era-desc">Camara desechable</div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Autodream Toggle -->
+            <div id="autodream-badge" class="autodream-badge">
+                <button id="btn-autodream" class="autodream-btn">
+                    <div class="autodream-icon">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                        </svg>
+                    </div>
+                    <span class="autodream-label">Autodream</span>
+                    <div class="autodream-toggle">
+                        <div class="autodream-toggle-dot"></div>
+                    </div>
+                </button>
             </div>
 
             <!-- Bottom Controls -->

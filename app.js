@@ -17,6 +17,7 @@
     let isDrawing = false;
     let textColor = '#FFFFFF';
     let activeTool = 'adjust';
+    let autodreamEnabled = false;
 
     // ==================== DOM ====================
     const $ = id => document.getElementById(id);
@@ -95,6 +96,16 @@
         $('btn-flash').classList.toggle('flash-on', flashEnabled);
     });
 
+    // ==================== AUTODREAM ====================
+    const dreamOverlay = $('dream-overlay');
+    const autodreamBtn = $('btn-autodream');
+
+    autodreamBtn.addEventListener('click', () => {
+        autodreamEnabled = !autodreamEnabled;
+        autodreamBtn.classList.toggle('active', autodreamEnabled);
+        dreamOverlay.classList.toggle('active', autodreamEnabled);
+    });
+
     // ==================== ERA PICKER ====================
     $('btn-era').addEventListener('click', () => {
         eraPicker.classList.toggle('hidden');
@@ -168,7 +179,10 @@
         const overlay = document.createElement('div');
         overlay.className = 'processing-overlay';
         overlay.id = 'processing';
-        overlay.innerHTML = '<div class="processing-spinner"></div><div class="processing-text">Viajando al pasado...</div>';
+        const dreamMsg = autodreamEnabled
+            ? '<div class="processing-text dream-text">Entrando al sueno...</div>'
+            : '<div class="processing-text">Viajando al pasado...</div>';
+        overlay.innerHTML = '<div class="processing-spinner"></div>' + dreamMsg;
         document.body.appendChild(overlay);
     }
 
@@ -209,6 +223,11 @@
         }
         if (currentEra === '1970') applyLightLeak(ctx, w, h);
         if (currentEra === '1990') applyFlashGlare(ctx, w, h);
+
+        // Autodream effect
+        if (autodreamEnabled) {
+            applyDreamEffect(ctx, w, h);
+        }
 
         // Date stamp
         const era = eras[currentEra];
@@ -332,6 +351,118 @@
             data[i+1] = clamp(data[i+1] * 0.9 + 20);
             data[i+2] = clamp(data[i+2] * 0.9 + 15);
         }
+    }
+
+    // ==================== AUTODREAM EFFECT ====================
+
+    function applyDreamEffect(ctx, w, h) {
+        // 1. Soft glow - brighten highlights and blur
+        const glowCanvas = document.createElement('canvas');
+        glowCanvas.width = w;
+        glowCanvas.height = h;
+        const gctx = glowCanvas.getContext('2d');
+        gctx.drawImage(ctx.canvas, 0, 0);
+
+        // Extract and boost highlights
+        const glowData = gctx.getImageData(0, 0, w, h);
+        const gd = glowData.data;
+        for (let i = 0; i < gd.length; i += 4) {
+            const lum = gd[i] * 0.299 + gd[i+1] * 0.587 + gd[i+2] * 0.114;
+            const factor = Math.max(0, (lum - 120) / 135);
+            gd[i] = clamp(gd[i] + factor * 80);
+            gd[i+1] = clamp(gd[i+1] + factor * 60);
+            gd[i+2] = clamp(gd[i+2] + factor * 100);
+        }
+        gctx.putImageData(glowData, 0, 0);
+
+        // Blend glow layer with soft light
+        ctx.globalAlpha = 0.35;
+        ctx.globalCompositeOperation = 'screen';
+        ctx.filter = 'blur(12px)';
+        ctx.drawImage(glowCanvas, 0, 0);
+        ctx.filter = 'none';
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+
+        // 2. Color shift - purple/blue dreamlike tint
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const d = imgData.data;
+        for (let i = 0; i < d.length; i += 4) {
+            // Shift shadows to purple, highlights to cyan
+            const lum = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+            const shadowFactor = Math.max(0, 1 - lum / 128);
+            const highFactor = Math.max(0, (lum - 128) / 127);
+
+            // Purple in shadows
+            d[i] = clamp(d[i] + shadowFactor * 15);
+            d[i+1] = clamp(d[i+1] - shadowFactor * 8);
+            d[i+2] = clamp(d[i+2] + shadowFactor * 25);
+
+            // Cyan/pink in highlights
+            d[i] = clamp(d[i] + highFactor * 10);
+            d[i+1] = clamp(d[i+1] + highFactor * 8);
+            d[i+2] = clamp(d[i+2] + highFactor * 15);
+
+            // Slight desaturation for ethereal feel
+            const gray = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+            d[i] = clamp(d[i] * 0.85 + gray * 0.15);
+            d[i+1] = clamp(d[i+1] * 0.85 + gray * 0.15);
+            d[i+2] = clamp(d[i+2] * 0.85 + gray * 0.15);
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        // 3. Ethereal light orbs
+        const orbCount = 3 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < orbCount; i++) {
+            const ox = Math.random() * w;
+            const oy = Math.random() * h;
+            const or = w * (0.08 + Math.random() * 0.15);
+            const colors = [
+                [160, 100, 255],
+                [100, 180, 255],
+                [255, 100, 200],
+                [100, 255, 200],
+                [255, 200, 100]
+            ];
+            const c = colors[Math.floor(Math.random() * colors.length)];
+            const gradient = ctx.createRadialGradient(ox, oy, 0, ox, oy, or);
+            gradient.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},0.12)`);
+            gradient.addColorStop(0.5, `rgba(${c[0]},${c[1]},${c[2]},0.05)`);
+            gradient.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, w, h);
+        }
+
+        // 4. Subtle sparkle particles
+        const sparkleCount = 15 + Math.floor(Math.random() * 20);
+        for (let i = 0; i < sparkleCount; i++) {
+            const sx = Math.random() * w;
+            const sy = Math.random() * h;
+            const sr = Math.random() * 3 + 1;
+            const alpha = 0.3 + Math.random() * 0.5;
+            ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+            ctx.beginPath();
+            ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+            ctx.fill();
+            // Cross sparkle
+            if (Math.random() > 0.6) {
+                ctx.strokeStyle = `rgba(255,255,255,${alpha * 0.5})`;
+                ctx.lineWidth = 0.5;
+                ctx.beginPath();
+                ctx.moveTo(sx - sr * 3, sy);
+                ctx.lineTo(sx + sr * 3, sy);
+                ctx.moveTo(sx, sy - sr * 3);
+                ctx.lineTo(sx, sy + sr * 3);
+                ctx.stroke();
+            }
+        }
+
+        // 5. Dreamy vignette with color
+        const dreamVig = ctx.createRadialGradient(w/2, h/2, w * 0.3, w/2, h/2, w * 0.7);
+        dreamVig.addColorStop(0, 'rgba(0,0,0,0)');
+        dreamVig.addColorStop(1, 'rgba(40,10,60,0.35)');
+        ctx.fillStyle = dreamVig;
+        ctx.fillRect(0, 0, w, h);
     }
 
     // ==================== OVERLAY EFFECTS ====================

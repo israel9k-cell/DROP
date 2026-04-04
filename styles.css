@@ -246,6 +246,113 @@ html, body {
 .gallery-thumb-img[style*="url"] ~ .gallery-placeholder { display: none; }
 .gallery-placeholder { display: block; }
 
+/* ==================== AUTODREAM ==================== */
+.autodream-badge {
+    position: absolute;
+    bottom: 140px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+}
+
+.autodream-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    background: rgba(15,10,20,0.85);
+    border: 1.5px solid rgba(160,100,255,0.25);
+    border-radius: 30px;
+    cursor: pointer;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: transform 0.15s, border-color 0.3s, box-shadow 0.3s;
+    color: var(--text-dim);
+}
+.autodream-btn:active { transform: scale(0.95); }
+.autodream-btn.active {
+    border-color: rgba(160,100,255,0.6);
+    box-shadow: 0 0 24px rgba(160,100,255,0.25), inset 0 0 12px rgba(160,100,255,0.08);
+    color: #d4b0ff;
+}
+
+.autodream-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(160,100,255,0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.3s;
+}
+.autodream-btn.active .autodream-icon {
+    background: rgba(160,100,255,0.3);
+    color: #d4b0ff;
+    animation: dreamPulse 2s ease-in-out infinite;
+}
+@keyframes dreamPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(160,100,255,0.2); }
+    50% { box-shadow: 0 0 20px rgba(160,100,255,0.5); }
+}
+
+.autodream-label {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    transition: color 0.3s;
+}
+
+.autodream-toggle {
+    width: 40px;
+    height: 22px;
+    border-radius: 12px;
+    background: #333;
+    position: relative;
+    transition: background 0.3s;
+}
+.autodream-btn.active .autodream-toggle {
+    background: linear-gradient(135deg, #A064FF, #6030C0);
+}
+.autodream-toggle-dot {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #888;
+    transition: transform 0.3s, background 0.3s;
+}
+.autodream-btn.active .autodream-toggle-dot {
+    transform: translateX(18px);
+    background: #fff;
+}
+
+/* Dream active camera overlay */
+.dream-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    background:
+        radial-gradient(ellipse at 20% 50%, rgba(160,80,255,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 30%, rgba(80,160,255,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(255,100,200,0.05) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity 0.5s;
+    mix-blend-mode: screen;
+}
+.dream-overlay.active { opacity: 1; }
+
+/* Dream processing text */
+.dream-text {
+    background: linear-gradient(135deg, #d4b0ff, #80c0ff, #ff80c0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
 /* Capture Button */
 .capture-btn {
     width: 82px;
