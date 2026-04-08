@@ -2,7 +2,7 @@
 # Diagnóstico de NAS - ejecutar en tu PC local
 # Uso: bash nas_diagnostico.sh <IP-del-NAS>
 
-NAS_IP="${1:-192.168.1.100}"
+NAS_IP="${1:-192.168.1.230}"
 
 echo "========================================="
 echo "  Diagnóstico NAS: $NAS_IP"
