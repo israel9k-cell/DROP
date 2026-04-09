@@ -1,0 +1,12 @@
+[Unit]
+Description=Nginx Watchdog - Auto restart nginx if it crashes
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nginx_watchdog.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
