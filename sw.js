@@ -1,4 +1,4 @@
-const CACHE = 'timelens-v1';
+const CACHE = 'sweet-glam-v1';
 const ASSETS = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.json'];
 
 self.addEventListener('install', e => {
